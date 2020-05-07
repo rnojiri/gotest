@@ -3,6 +3,7 @@ package gotest_test
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/uol/gotest"
@@ -12,6 +13,11 @@ import (
 * The tests for the http server used by tests.
 * @author rnojiri
 **/
+
+const (
+	testHost string = "localhost"
+	testPort int    = 18080
+)
 
 // TestNoResponse - tests when no response configurations were found
 func TestNoResponse(t *testing.T) {
@@ -41,24 +47,24 @@ func createDummyResponse() gotest.ResponseData {
 // Test404 - tests when a non mapped response is called
 func Test404(t *testing.T) {
 
-	server := gotest.CreateNewTestHTTPServer([]gotest.ResponseData{createDummyResponse()})
+	server := gotest.CreateNewTestHTTPServer(testHost, testPort, []gotest.ResponseData{createDummyResponse()})
 	defer server.Close()
 
-	response := gotest.DoRequest(&gotest.RequestData{
+	response := gotest.DoRequest(testHost, testPort, &gotest.RequestData{
 		URI:    "/not",
 		Method: "GET",
 	})
 
 	assert.Equal(t, http.StatusNotFound, response.Status, "expected 404 status")
 
-	response = gotest.DoRequest(&gotest.RequestData{
+	response = gotest.DoRequest(testHost, testPort, &gotest.RequestData{
 		URI:    "/test",
 		Method: "POST",
 	})
 
 	assert.Equal(t, http.StatusNotFound, response.Status, "expected 404 status")
 
-	response = gotest.DoRequest(&gotest.RequestData{
+	response = gotest.DoRequest(testHost, testPort, &gotest.RequestData{
 		URI:    "/test",
 		Method: "GET",
 	})
@@ -71,7 +77,7 @@ func TestSuccess(t *testing.T) {
 
 	configuredResponse := createDummyResponse()
 
-	server := gotest.CreateNewTestHTTPServer([]gotest.ResponseData{configuredResponse})
+	server := gotest.CreateNewTestHTTPServer(testHost, testPort, []gotest.ResponseData{configuredResponse})
 	defer server.Close()
 
 	reqHeader := http.Header{}
@@ -84,12 +90,12 @@ func TestSuccess(t *testing.T) {
 		Headers: reqHeader,
 	}
 
-	serverResponse := gotest.DoRequest(clientRequest)
+	serverResponse := gotest.DoRequest(testHost, testPort, clientRequest)
 	if !compareResponses(t, &configuredResponse, serverResponse) {
 		return
 	}
 
-	serverRequest := gotest.WaitForHTTPServerRequest(server)
+	serverRequest := gotest.WaitForHTTPServerRequest(server, time.Second, 10*time.Second)
 	compareRequests(t, clientRequest, serverRequest)
 }
 
@@ -108,7 +114,7 @@ func TestMultipleResponses(t *testing.T) {
 	configuredResponse2.Headers.Del("Content-type")
 	configuredResponse2.Headers.Set("Content-type", "application/json")
 
-	server := gotest.CreateNewTestHTTPServer([]gotest.ResponseData{configuredResponse1, configuredResponse2})
+	server := gotest.CreateNewTestHTTPServer(testHost, testPort, []gotest.ResponseData{configuredResponse1, configuredResponse2})
 	defer server.Close()
 
 	reqHeader1 := http.Header{}
@@ -121,12 +127,12 @@ func TestMultipleResponses(t *testing.T) {
 		Headers: reqHeader1,
 	}
 
-	serverResponse := gotest.DoRequest(clientRequest1)
+	serverResponse := gotest.DoRequest(testHost, testPort, clientRequest1)
 	if !compareResponses(t, &configuredResponse1, serverResponse) {
 		return
 	}
 
-	serverRequest := gotest.WaitForHTTPServerRequest(server)
+	serverRequest := gotest.WaitForHTTPServerRequest(server, time.Second, 10*time.Second)
 	compareRequests(t, clientRequest1, serverRequest)
 
 	reqHeader2 := http.Header{}
@@ -139,12 +145,12 @@ func TestMultipleResponses(t *testing.T) {
 		Headers: reqHeader2,
 	}
 
-	serverResponse = gotest.DoRequest(clientRequest2)
+	serverResponse = gotest.DoRequest(testHost, testPort, clientRequest2)
 	if !compareResponses(t, &configuredResponse2, serverResponse) {
 		return
 	}
 
-	serverRequest = gotest.WaitForHTTPServerRequest(server)
+	serverRequest = gotest.WaitForHTTPServerRequest(server, time.Second, 10*time.Second)
 	compareRequests(t, clientRequest2, serverRequest)
 }
 
