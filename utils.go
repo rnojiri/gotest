@@ -3,9 +3,10 @@ package gotest
 import (
 	"bytes"
 	"fmt"
-	"github.com/uol/funks"
 	"net/http"
 	"time"
+
+	"github.com/uol/funks"
 )
 
 /**
@@ -13,20 +14,10 @@ import (
 * @author rnojiri
 **/
 
-const (
-	// TestServerHost - the test server's hostname
-	TestServerHost = "localhost"
-
-	// TestServerPort - the test server's port
-	TestServerPort = 18080
-
-	maxRequestTimeout = 10
-)
-
 // CreateNewTestHTTPServer - creates a new server
-func CreateNewTestHTTPServer(responses []ResponseData) *HTTPServer {
+func CreateNewTestHTTPServer(testServerHost string, testServerPort int, responses []ResponseData) *HTTPServer {
 
-	s, err := NewHTTPServer(TestServerHost, TestServerPort, 5, responses)
+	s, err := NewHTTPServer(testServerHost, testServerPort, 5, responses)
 	if err != nil {
 		panic(err)
 	}
@@ -35,11 +26,11 @@ func CreateNewTestHTTPServer(responses []ResponseData) *HTTPServer {
 }
 
 // DoRequest - does a request
-func DoRequest(request *RequestData) *ResponseData {
+func DoRequest(testServerHost string, testServerPort int, request *RequestData) *ResponseData {
 
 	client := funks.CreateHTTPClient(time.Second, true)
 
-	req, err := http.NewRequest(request.Method, fmt.Sprintf("http://%s:%d/%s", TestServerHost, TestServerPort, request.URI), bytes.NewBuffer([]byte(request.Body)))
+	req, err := http.NewRequest(request.Method, fmt.Sprintf("http://%s:%d/%s", testServerHost, testServerPort, request.URI), bytes.NewBuffer([]byte(request.Body)))
 	if err != nil {
 		panic(err)
 	}
@@ -53,7 +44,7 @@ func DoRequest(request *RequestData) *ResponseData {
 		panic(err)
 	}
 
-	result, err := ParseResponse(res)
+	result, err := ParseResponse(res, request.Date)
 	if err != nil {
 		panic(err)
 	}
@@ -64,10 +55,10 @@ func DoRequest(request *RequestData) *ResponseData {
 }
 
 // WaitForHTTPServerRequest - wait until timeout or for the server sets the request in the channel
-func WaitForHTTPServerRequest(server *HTTPServer) *RequestData {
+func WaitForHTTPServerRequest(server *HTTPServer, waitFor, maxRequestTimeout time.Duration) *RequestData {
 
 	var request *RequestData
-	var seconds int
+	start := time.Now()
 
 	for {
 		select {
@@ -79,10 +70,9 @@ func WaitForHTTPServerRequest(server *HTTPServer) *RequestData {
 			break
 		}
 
-		<-time.After(time.Second)
-		seconds++
+		<-time.After(waitFor)
 
-		if seconds >= maxRequestTimeout {
+		if time.Since(start) > maxRequestTimeout {
 			break
 		}
 	}

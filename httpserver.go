@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"regexp"
 	"strings"
+	"time"
 )
 
 /**
@@ -21,6 +22,7 @@ type RequestData struct {
 	Body    string
 	Method  string
 	Headers http.Header
+	Date    time.Time
 }
 
 // ResponseData - the expected response data for each configured URI
@@ -123,6 +125,7 @@ func (hl *HTTPServer) handler(res http.ResponseWriter, req *http.Request) {
 		Body:    bufferReqBody.String(),
 		Headers: req.Header,
 		Method:  req.Method,
+		Date:    time.Now(),
 	}
 }
 
@@ -141,7 +144,7 @@ func (hl *HTTPServer) RequestChannel() <-chan *RequestData {
 }
 
 // ParseResponse - parses the response using the local struct as result
-func ParseResponse(res *http.Response) (*ResponseData, error) {
+func ParseResponse(res *http.Response, reqDate time.Time) (*ResponseData, error) {
 
 	bufferReqBody := new(bytes.Buffer)
 	_, err := bufferReqBody.ReadFrom(res.Body)
@@ -155,6 +158,7 @@ func ParseResponse(res *http.Response) (*ResponseData, error) {
 			Body:    bufferReqBody.String(),
 			Headers: res.Header,
 			Method:  res.Request.Method,
+			Date:    reqDate,
 		},
 		Status: res.StatusCode,
 	}, nil
