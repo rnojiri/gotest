@@ -1,4 +1,4 @@
-package gotest
+package http
 
 import (
 	"bytes"
@@ -31,23 +31,24 @@ type ResponseData struct {
 	Status int
 }
 
-// HTTPServer - the server listening for HTTP requests
-type HTTPServer struct {
+// Server - the server listening for HTTP requests
+type Server struct {
 	server         *httptest.Server
 	requestChannel chan *RequestData
 	responseMap    map[string]ResponseData
+	errors         []error
 }
 
 var multipleBarRegexp = regexp.MustCompile("[/]+")
 
-// NewHTTPServer - creates a new HTTP listener server
-func NewHTTPServer(host string, port, channelSize int, responses []ResponseData) (*HTTPServer, error) {
+// NewServer - creates a new HTTP listener server
+func NewServer(host string, port, channelSize int, responses []ResponseData) *Server {
 
 	if len(responses) == 0 {
-		return nil, fmt.Errorf("expected at least one response")
+		panic(fmt.Errorf("expected at least one response"))
 	}
 
-	hs := &HTTPServer{
+	hs := &Server{
 		requestChannel: make(chan *RequestData, channelSize),
 	}
 
@@ -61,13 +62,13 @@ func NewHTTPServer(host string, port, channelSize int, responses []ResponseData)
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	hs.server.Listener = listener
 	hs.server.Start()
 
-	return hs, nil
+	return hs
 }
 
 // CopyHeaders - copy all the headers
@@ -93,11 +94,11 @@ func CleanURI(name string) string {
 }
 
 // handler - handles all requests
-func (hl *HTTPServer) handler(res http.ResponseWriter, req *http.Request) {
+func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 
 	cleanURI := CleanURI(req.RequestURI)
 
-	responseData, ok := hl.responseMap[cleanURI]
+	responseData, ok := hs.responseMap[cleanURI]
 	if !ok || responseData.Method != req.Method {
 		res.WriteHeader(http.StatusNotFound)
 		return
@@ -113,14 +114,15 @@ func (hl *HTTPServer) handler(res http.ResponseWriter, req *http.Request) {
 	if len(responseData.Body) > 0 {
 		_, err := res.Write([]byte(responseData.Body))
 		if err != nil {
-			fmt.Println(fmt.Errorf("error writing response body: %s", err.Error()))
+			hs.errors = append(hs.errors, err)
+			return
 		}
 	}
 
 	bufferReqBody := new(bytes.Buffer)
 	bufferReqBody.ReadFrom(req.Body)
 
-	hl.requestChannel <- &RequestData{
+	hs.requestChannel <- &RequestData{
 		URI:     cleanURI,
 		Body:    bufferReqBody.String(),
 		Headers: req.Header,
@@ -130,36 +132,15 @@ func (hl *HTTPServer) handler(res http.ResponseWriter, req *http.Request) {
 }
 
 // Close - closes this server
-func (hl *HTTPServer) Close() {
+func (hs *Server) Close() {
 
-	if hl.server != nil {
-		hl.server.Close()
+	if hs.server != nil {
+		hs.server.Close()
 	}
 }
 
 // RequestChannel - reads from the request channel
-func (hl *HTTPServer) RequestChannel() <-chan *RequestData {
+func (hs *Server) RequestChannel() <-chan *RequestData {
 
-	return hl.requestChannel
-}
-
-// ParseResponse - parses the response using the local struct as result
-func ParseResponse(res *http.Response, reqDate time.Time) (*ResponseData, error) {
-
-	bufferReqBody := new(bytes.Buffer)
-	_, err := bufferReqBody.ReadFrom(res.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ResponseData{
-		RequestData: RequestData{
-			URI:     res.Request.RequestURI,
-			Body:    bufferReqBody.String(),
-			Headers: res.Header,
-			Method:  res.Request.Method,
-			Date:    reqDate,
-		},
-		Status: res.StatusCode,
-	}, nil
+	return hs.requestChannel
 }

@@ -1,4 +1,4 @@
-package gotest
+package http
 
 import (
 	"bytes"
@@ -13,17 +13,6 @@ import (
 * Common helper functions.
 * @author rnojiri
 **/
-
-// CreateNewTestHTTPServer - creates a new server
-func CreateNewTestHTTPServer(testServerHost string, testServerPort int, responses []ResponseData) *HTTPServer {
-
-	s, err := NewHTTPServer(testServerHost, testServerPort, 5, responses)
-	if err != nil {
-		panic(err)
-	}
-
-	return s
-}
 
 // DoRequest - does a request
 func DoRequest(testServerHost string, testServerPort int, request *RequestData) *ResponseData {
@@ -44,7 +33,7 @@ func DoRequest(testServerHost string, testServerPort int, request *RequestData) 
 		panic(err)
 	}
 
-	result, err := ParseResponse(res, request.Date)
+	result, err := parseResponse(res, request.Date)
 	if err != nil {
 		panic(err)
 	}
@@ -54,8 +43,29 @@ func DoRequest(testServerHost string, testServerPort int, request *RequestData) 
 	return result
 }
 
-// WaitForHTTPServerRequest - wait until timeout or for the server sets the request in the channel
-func WaitForHTTPServerRequest(server *HTTPServer, waitFor, maxRequestTimeout time.Duration) *RequestData {
+// parseResponse - parses the response using the local struct as result
+func parseResponse(res *http.Response, reqDate time.Time) (*ResponseData, error) {
+
+	bufferReqBody := new(bytes.Buffer)
+	_, err := bufferReqBody.ReadFrom(res.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ResponseData{
+		RequestData: RequestData{
+			URI:     res.Request.RequestURI,
+			Body:    bufferReqBody.String(),
+			Headers: res.Header,
+			Method:  res.Request.Method,
+			Date:    reqDate,
+		},
+		Status: res.StatusCode,
+	}, nil
+}
+
+// WaitForServerRequest - wait until timeout or for the server sets the request in the channel
+func WaitForServerRequest(server *Server, waitFor, maxRequestTimeout time.Duration) *RequestData {
 
 	var request *RequestData
 	start := time.Now()
