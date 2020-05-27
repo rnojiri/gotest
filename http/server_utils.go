@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/uol/funks"
@@ -88,4 +89,26 @@ func WaitForServerRequest(server *Server, waitFor, maxRequestTimeout time.Durati
 	}
 
 	return request
+}
+
+// CopyHeaders - copy all the headers
+func CopyHeaders(source http.Header, dest http.Header) {
+
+	if len(source) > 0 {
+		for header, valueList := range source {
+			for _, v := range valueList {
+				dest.Set(header, v)
+			}
+		}
+	}
+}
+
+// CleanURI - cleans and validates the URI
+func CleanURI(name string) string {
+
+	if !strings.HasPrefix(name, "/") {
+		name += "/"
+	}
+
+	return multipleBarRegexp.ReplaceAllString(name, "/")
 }
