@@ -20,24 +20,18 @@ const (
 // TestCreateServer - tests creating the server only (not accepting connections)
 func TestCreateServer(t *testing.T) {
 
-	s, p, err := gotesttelnet.NewServer(testHost, numMsgChan, bufferSize, time.Second, false)
-	if !assert.NoError(t, err, "error not expected") {
-		return
-	}
+	s, p := gotesttelnet.NewServer(testHost, numMsgChan, bufferSize, time.Second, false)
 
 	if !assert.NotNil(t, s, "expected a valid instance") {
 		return
 	}
 
-	assert.GreaterOrEqual(t, 10000, p, "expected port greater than 10000")
+	assert.GreaterOrEqual(t, p, 10000, "expected port greater than 10000")
 }
 
 func mustCreateServer(autoStart bool, readTimeout time.Duration) (*gotesttelnet.Server, int) {
 
-	s, port, err := gotesttelnet.NewServer(testHost, numMsgChan, bufferSize, readTimeout, autoStart)
-	if err != nil {
-		panic(err)
-	}
+	s, port := gotesttelnet.NewServer(testHost, numMsgChan, bufferSize, readTimeout, autoStart)
 
 	return s, port
 }

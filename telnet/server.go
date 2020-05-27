@@ -30,7 +30,7 @@ type MessageData struct {
 }
 
 // NewServer - creates a new telnet server on a random port
-func NewServer(host string, messageChannelSize int, readBufferSize int, readTimeout time.Duration, start bool) (*Server, int, error) {
+func NewServer(host string, messageChannelSize int, readBufferSize int, readTimeout time.Duration, start bool) (*Server, int) {
 
 	var listener net.Listener
 	var port int
@@ -52,7 +52,7 @@ func NewServer(host string, messageChannelSize int, readBufferSize int, readTime
 	}
 
 	if err != nil {
-		return nil, 0, err
+		panic(err)
 	}
 
 	server := &Server{
@@ -67,7 +67,7 @@ func NewServer(host string, messageChannelSize int, readBufferSize int, readTime
 		server.Start()
 	}
 
-	return server, port, nil
+	return server, port
 }
 
 // Start - starts the server to receive connections
