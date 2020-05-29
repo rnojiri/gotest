@@ -38,3 +38,14 @@ func RandomInt(min, max int) int {
 
 	return min + rand.Intn(max+1)
 }
+
+// MustParseDuration - forces to parse the duration or it panics
+func MustParseDuration(value string) time.Duration {
+
+	d, err := time.ParseDuration(value)
+	if err != nil {
+		panic(err)
+	}
+
+	return d
+}
