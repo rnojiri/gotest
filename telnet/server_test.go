@@ -17,10 +17,19 @@ const (
 	bufferSize int    = 256
 )
 
+var (
+	defaultConf gotesttelnet.Configuration = gotesttelnet.Configuration{
+		Host:               testHost,
+		MessageChannelSize: numMsgChan,
+		ReadBufferSize:     bufferSize,
+		ReadTimeout:        time.Second,
+	}
+)
+
 // TestCreateServer - tests creating the server only (not accepting connections)
 func TestCreateServer(t *testing.T) {
 
-	s, p := gotesttelnet.NewServer(testHost, numMsgChan, bufferSize, time.Second, false)
+	s, p := gotesttelnet.NewServer(&defaultConf, false)
 
 	if !assert.NotNil(t, s, "expected a valid instance") {
 		return
@@ -31,7 +40,7 @@ func TestCreateServer(t *testing.T) {
 
 func mustCreateServer(autoStart bool, readTimeout time.Duration) (*gotesttelnet.Server, int) {
 
-	s, port := gotesttelnet.NewServer(testHost, numMsgChan, bufferSize, readTimeout, autoStart)
+	s, port := gotesttelnet.NewServer(&defaultConf, autoStart)
 
 	return s, port
 }
@@ -131,4 +140,47 @@ func TestMultipleMessages(t *testing.T) {
 	}
 
 	assert.Len(t, s.GetErrors(), 0, "expected no errors")
+}
+
+// TestServerResponse - tests the server mocked response
+func TestServerResponse(t *testing.T) {
+
+	responseConf := defaultConf
+	responseConf.ResponseString = "response"
+	responseConf.WriteTimeout = time.Second
+
+	s, port := gotesttelnet.NewServer(&responseConf, true)
+	defer s.Stop()
+	if s == nil {
+		return
+	}
+
+	conn, err := gotesttelnet.Connect(testHost, port, 3*time.Second)
+	if !assert.NoError(t, err, "expected no error connecting") {
+		return
+	}
+
+	payload := "request"
+
+	err = gotesttelnet.Write(conn, payload)
+	if !assert.NoError(t, err, "expected no error writing") {
+		return
+	}
+
+	response, err := gotesttelnet.Read(conn, bufferSize)
+	if !assert.NoError(t, err, "expected no error reading") {
+		return
+	}
+
+	if !assert.Equal(t, responseConf.ResponseString, response, "expected the configured response") {
+		return
+	}
+
+	message := <-s.MessageChannel()
+	if !assert.Equal(t, payload, message.Message, "expected same value") {
+		return
+	}
+
+	assert.Len(t, s.GetErrors(), 0, "expected no errors")
+
 }

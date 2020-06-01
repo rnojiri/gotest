@@ -17,10 +17,9 @@ type Server struct {
 	listener       net.Listener
 	errors         []error
 	messageChannel chan MessageData
-	readTimeout    time.Duration
-	readBufferSize int
 	port           int
 	started        bool
+	configuration  *Configuration
 }
 
 // MessageData - the message data received
@@ -29,8 +28,18 @@ type MessageData struct {
 	Date    time.Time
 }
 
+// Configuration - the server configuration
+type Configuration struct {
+	Host               string
+	MessageChannelSize int
+	ReadBufferSize     int
+	ReadTimeout        time.Duration
+	WriteTimeout       time.Duration
+	ResponseString     string
+}
+
 // NewServer - creates a new telnet server on a random port
-func NewServer(host string, messageChannelSize int, readBufferSize int, readTimeout time.Duration, start bool) (*Server, int) {
+func NewServer(configuration *Configuration, start bool) (*Server, int) {
 
 	var listener net.Listener
 	var port int
@@ -40,7 +49,7 @@ func NewServer(host string, messageChannelSize int, readBufferSize int, readTime
 
 		port = utils.GeneratePort()
 
-		listener, err = net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
+		listener, err = net.Listen("tcp", fmt.Sprintf("%s:%d", configuration.Host, port))
 		if err != nil {
 			if strings.Contains(err.Error(), "address already in use") {
 				<-time.After(time.Second)
@@ -56,11 +65,10 @@ func NewServer(host string, messageChannelSize int, readBufferSize int, readTime
 	}
 
 	server := &Server{
-		messageChannel: make(chan MessageData, messageChannelSize),
-		readTimeout:    readTimeout,
+		messageChannel: make(chan MessageData, configuration.MessageChannelSize),
 		listener:       listener,
-		readBufferSize: readBufferSize,
 		port:           port,
+		configuration:  configuration,
 	}
 
 	if start {
@@ -91,12 +99,6 @@ func (ts *Server) startListeningLoop() {
 			return
 		}
 
-		err = conn.SetReadDeadline(time.Now().Add(ts.readTimeout))
-		if err != nil {
-			ts.errors = append(ts.errors, err)
-			return
-		}
-
 		ts.handleConnection(conn)
 	}
 }
@@ -115,7 +117,13 @@ func (ts *Server) handleConnection(conn net.Conn) {
 	buffer := bytes.Buffer{}
 
 	for {
-		readBuffer := make([]byte, ts.readBufferSize)
+		err := conn.SetReadDeadline(time.Now().Add(ts.configuration.ReadTimeout))
+		if err != nil {
+			ts.errors = append(ts.errors, err)
+			return
+		}
+
+		readBuffer := make([]byte, ts.configuration.ReadBufferSize)
 		n, err := conn.Read(readBuffer)
 		if err != nil {
 			if nErr, ok := err.(net.Error); ok {
@@ -134,6 +142,20 @@ func (ts *Server) handleConnection(conn net.Conn) {
 
 		_, err = buffer.Write(bytes.Trim(readBuffer, "\x00"))
 		if err != nil {
+			return
+		}
+	}
+
+	err := conn.SetWriteDeadline(time.Now().Add(ts.configuration.WriteTimeout))
+	if err != nil {
+		ts.errors = append(ts.errors, err)
+		return
+	}
+
+	if len(ts.configuration.ResponseString) > 0 {
+		_, err := conn.Write(([]byte)(ts.configuration.ResponseString))
+		if err != nil {
+			ts.errors = append(ts.errors, err)
 			return
 		}
 	}

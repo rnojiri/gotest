@@ -1,6 +1,7 @@
 package telnet
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"time"
@@ -55,5 +56,5 @@ func Read(connection *net.TCPConn, bufferSize int) (string, error) {
 		return "", err
 	}
 
-	return string(readBuffer), nil
+	return string(bytes.Trim(readBuffer, "\x00")), nil
 }
