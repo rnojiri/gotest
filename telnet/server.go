@@ -106,8 +106,6 @@ func (ts *Server) startListeningLoop() {
 // Stop - stops the server
 func (ts *Server) Stop() error {
 
-	close(ts.messageChannel)
-
 	return ts.listener.Close()
 }
 
