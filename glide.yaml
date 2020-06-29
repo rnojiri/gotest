@@ -1,4 +1,0 @@
-package: github.com/uol/gotest
-import:
-- package: github.com/uol/funks
-  version: ~1.0.0
