@@ -23,7 +23,7 @@ func GeneratePort() int {
 
 	GenerateRandomSeed()
 
-	port, err := strconv.Atoi(fmt.Sprintf("1%d", rand.Intn(9999)))
+	port, err := strconv.Atoi(fmt.Sprintf("1%d", RandomInt(1000, 8888)))
 	if err != nil {
 		panic(err)
 	}

@@ -1,4 +1,4 @@
-package telnet
+package tcpudp
 
 import (
 	"bytes"
@@ -7,10 +7,15 @@ import (
 	"time"
 )
 
+//
+// Functions to interact with the tcp server.
+// author: rnojiri
+//
+
 const milisBetweenWrites time.Duration = 10
 
-// Connect - connects to the specified address
-func Connect(host string, port int, deadline time.Duration) (*net.TCPConn, error) {
+// ConnectTCP - connects to the specified address
+func ConnectTCP(host string, port int, deadline time.Duration) (*net.TCPConn, error) {
 
 	address, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
@@ -33,8 +38,8 @@ func Connect(host string, port int, deadline time.Duration) (*net.TCPConn, error
 	return connection, nil
 }
 
-// Write - writes to the connection
-func Write(connection *net.TCPConn, payload string) error {
+// WriteTCP - writes to the connection
+func WriteTCP(connection *net.TCPConn, payload string) error {
 
 	_, err := connection.Write(([]byte)(payload))
 	if err != nil {
@@ -46,8 +51,8 @@ func Write(connection *net.TCPConn, payload string) error {
 	return nil
 }
 
-// Read - read from the connection
-func Read(connection *net.TCPConn, bufferSize int) (string, error) {
+// ReadTCP - read from the connection
+func ReadTCP(connection *net.TCPConn, bufferSize int) (string, error) {
 
 	readBuffer := make([]byte, bufferSize)
 

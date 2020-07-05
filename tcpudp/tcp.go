@@ -1,4 +1,4 @@
-package telnet
+package tcpudp
 
 import (
 	"bytes"
@@ -10,36 +10,28 @@ import (
 	utils "github.com/uol/gotest/utils"
 )
 
-const listenRetries int = 10
+//
+// Creates a test tcp server.
+// author: rnojiri
+//
 
-// Server - the telnet server
-type Server struct {
-	listener       net.Listener
-	errors         []error
-	messageChannel chan MessageData
-	port           int
-	started        bool
-	configuration  *Configuration
+// TCPServer - the tcp server
+type TCPServer struct {
+	listener      net.Listener
+	configuration *TCPConfiguration
+	server
 }
 
-// MessageData - the message data received
-type MessageData struct {
-	Message string
-	Date    time.Time
+// TCPConfiguration - the tcp server configuration
+type TCPConfiguration struct {
+	ReadTimeout    time.Duration
+	WriteTimeout   time.Duration
+	ResponseString string
+	ServerConfiguration
 }
 
-// Configuration - the server configuration
-type Configuration struct {
-	Host               string
-	MessageChannelSize int
-	ReadBufferSize     int
-	ReadTimeout        time.Duration
-	WriteTimeout       time.Duration
-	ResponseString     string
-}
-
-// NewServer - creates a new telnet server on a random port
-func NewServer(configuration *Configuration, start bool) (*Server, int) {
+// NewTCPServer - creates a new telnet server on a random port
+func NewTCPServer(configuration *TCPConfiguration, start bool) (*TCPServer, int) {
 
 	var listener net.Listener
 	var port int
@@ -48,12 +40,18 @@ func NewServer(configuration *Configuration, start bool) (*Server, int) {
 	for i := 0; i < listenRetries; i++ {
 
 		port = utils.GeneratePort()
+		address, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", configuration.Host, port))
+		if err != nil {
+			panic(err)
+		}
 
-		listener, err = net.Listen("tcp", fmt.Sprintf("%s:%d", configuration.Host, port))
+		listener, err = net.ListenTCP("tcp", address)
 		if err != nil {
 			if strings.Contains(err.Error(), "address already in use") {
 				<-time.After(time.Second)
 				fmt.Println("port already in use, trying another...")
+			} else {
+				panic(err)
 			}
 		} else {
 			break
@@ -64,11 +62,13 @@ func NewServer(configuration *Configuration, start bool) (*Server, int) {
 		panic(err)
 	}
 
-	server := &Server{
-		messageChannel: make(chan MessageData, configuration.MessageChannelSize),
-		listener:       listener,
-		port:           port,
-		configuration:  configuration,
+	server := &TCPServer{
+		server: server{
+			messageChannel: make(chan MessageData, configuration.MessageChannelSize),
+			port:           port,
+		},
+		listener:      listener,
+		configuration: configuration,
 	}
 
 	if start {
@@ -79,7 +79,7 @@ func NewServer(configuration *Configuration, start bool) (*Server, int) {
 }
 
 // Start - starts the server to receive connections
-func (ts *Server) Start() {
+func (ts *TCPServer) Start() {
 
 	if ts.started {
 		return
@@ -90,7 +90,7 @@ func (ts *Server) Start() {
 	go ts.startListeningLoop()
 }
 
-func (ts *Server) startListeningLoop() {
+func (ts *TCPServer) startListeningLoop() {
 
 	for {
 		conn, err := ts.listener.Accept()
@@ -104,13 +104,13 @@ func (ts *Server) startListeningLoop() {
 }
 
 // Stop - stops the server
-func (ts *Server) Stop() error {
+func (ts *TCPServer) Stop() error {
 
 	return ts.listener.Close()
 }
 
 // handleConnection - handles the current connection
-func (ts *Server) handleConnection(conn net.Conn) {
+func (ts *TCPServer) handleConnection(conn net.Conn) {
 
 	buffer := bytes.Buffer{}
 
@@ -165,13 +165,13 @@ func (ts *Server) handleConnection(conn net.Conn) {
 }
 
 // MessageChannel - reads from the message channel
-func (ts *Server) MessageChannel() <-chan MessageData {
+func (ts *TCPServer) MessageChannel() <-chan MessageData {
 
 	return ts.messageChannel
 }
 
 // GetErrors - get asynchronous errors
-func (ts *Server) GetErrors() []error {
+func (ts *TCPServer) GetErrors() []error {
 
 	return ts.errors
 }
