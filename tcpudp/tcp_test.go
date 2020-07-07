@@ -76,6 +76,27 @@ func TestTCPStartedServerStop(t *testing.T) {
 	assert.NoError(t, err, "error not expected")
 }
 
+func testMessage(t *testing.T, message *tcpudp.MessageData, expectedText string, expectedPort int, expectedDate time.Time) bool {
+
+	if !assert.Equal(t, expectedText, message.Message, "expected same value") {
+		return false
+	}
+
+	if !assert.Equal(t, testHost, message.Host, "expected same host") {
+		return false
+	}
+
+	if !assert.Equal(t, expectedPort, message.Port, "expected same port") {
+		return false
+	}
+
+	if !assert.True(t, expectedDate.Sub(message.Date).Milliseconds() <= 1, "expected same date") {
+		return false
+	}
+
+	return true
+}
+
 // TestTCPOneMessage - tests the server with only one message
 func TestTCPOneMessage(t *testing.T) {
 
@@ -91,6 +112,7 @@ func TestTCPOneMessage(t *testing.T) {
 	}
 
 	payload := "test"
+	now := time.Now()
 
 	err = tcpudp.WriteTCP(conn, payload)
 	if !assert.NoError(t, err, "expected no error writing") {
@@ -98,7 +120,7 @@ func TestTCPOneMessage(t *testing.T) {
 	}
 
 	message := <-s.MessageChannel()
-	if !assert.Equal(t, payload, message.Message, "expected same value") {
+	if !testMessage(t, &message, payload, port, now) {
 		return
 	}
 
@@ -122,9 +144,7 @@ func TestTCPMultipleMessages(t *testing.T) {
 	messageFormat := "test%d\n"
 	numMessages := gotest.RandomInt(2, 10)
 	for i := 0; i < numMessages; i++ {
-
 		payload := fmt.Sprintf(messageFormat, i)
-
 		err = tcpudp.WriteTCP(conn, payload)
 		if !assert.NoError(t, err, "expected no error writing") {
 			return
@@ -168,6 +188,7 @@ func TestTCPServerResponse(t *testing.T) {
 	}
 
 	payload := "request"
+	now := time.Now()
 
 	err = tcpudp.WriteTCP(conn, payload)
 	if !assert.NoError(t, err, "expected no error writing") {
@@ -184,7 +205,7 @@ func TestTCPServerResponse(t *testing.T) {
 	}
 
 	message := <-s.MessageChannel()
-	if !assert.Equal(t, payload, message.Message, "expected same value") {
+	if !testMessage(t, &message, payload, port, now) {
 		return
 	}
 

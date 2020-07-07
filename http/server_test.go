@@ -14,11 +14,11 @@ import (
 * @author rnojiri
 **/
 
-const (
-	testHost    string = "localhost"
-	testPort    int    = 18080
-	channelSize int    = 5
-)
+var defaultConf gotesthttp.Configuration = gotesthttp.Configuration{
+	Host:        "localhost",
+	Port:        18080,
+	ChannelSize: 5,
+}
 
 // createDummyResponse - creates a dummy response data
 func createDummyResponse() gotesthttp.ResponseData {
@@ -40,24 +40,25 @@ func createDummyResponse() gotesthttp.ResponseData {
 // Test404 - tests when a non mapped response is called
 func Test404(t *testing.T) {
 
-	server := gotesthttp.NewServer(testHost, testPort, channelSize, []gotesthttp.ResponseData{createDummyResponse()})
+	defaultConf.Responses = []gotesthttp.ResponseData{createDummyResponse()}
+	server := gotesthttp.NewServer(&defaultConf)
 	defer server.Close()
 
-	response := gotesthttp.DoRequest(testHost, testPort, &gotesthttp.RequestData{
+	response := gotesthttp.DoRequest(defaultConf.Host, defaultConf.Port, &gotesthttp.RequestData{
 		URI:    "/not",
 		Method: "GET",
 	})
 
 	assert.Equal(t, http.StatusNotFound, response.Status, "expected 404 status")
 
-	response = gotesthttp.DoRequest(testHost, testPort, &gotesthttp.RequestData{
+	response = gotesthttp.DoRequest(defaultConf.Host, defaultConf.Port, &gotesthttp.RequestData{
 		URI:    "/test",
 		Method: "POST",
 	})
 
 	assert.Equal(t, http.StatusNotFound, response.Status, "expected 404 status")
 
-	response = gotesthttp.DoRequest(testHost, testPort, &gotesthttp.RequestData{
+	response = gotesthttp.DoRequest(defaultConf.Host, defaultConf.Port, &gotesthttp.RequestData{
 		URI:    "/test",
 		Method: "GET",
 	})
@@ -68,9 +69,9 @@ func Test404(t *testing.T) {
 // TestSuccess - tests when everything goes right
 func TestSuccess(t *testing.T) {
 
-	configuredResponse := createDummyResponse()
+	defaultConf.Responses = []gotesthttp.ResponseData{createDummyResponse()}
 
-	server := gotesthttp.NewServer(testHost, testPort, channelSize, []gotesthttp.ResponseData{configuredResponse})
+	server := gotesthttp.NewServer(&defaultConf)
 	defer server.Close()
 
 	reqHeader := http.Header{}
@@ -83,8 +84,8 @@ func TestSuccess(t *testing.T) {
 		Headers: reqHeader,
 	}
 
-	serverResponse := gotesthttp.DoRequest(testHost, testPort, clientRequest)
-	if !compareResponses(t, &configuredResponse, serverResponse) {
+	serverResponse := gotesthttp.DoRequest(defaultConf.Host, defaultConf.Port, clientRequest)
+	if !compareResponses(t, &defaultConf.Responses[0], serverResponse) {
 		return
 	}
 
@@ -107,7 +108,9 @@ func TestMultipleResponses(t *testing.T) {
 	configuredResponse2.Headers.Del("Content-type")
 	configuredResponse2.Headers.Set("Content-type", "application/json")
 
-	server := gotesthttp.NewServer(testHost, testPort, channelSize, []gotesthttp.ResponseData{configuredResponse1, configuredResponse2})
+	defaultConf.Responses = []gotesthttp.ResponseData{configuredResponse1, configuredResponse2}
+
+	server := gotesthttp.NewServer(&defaultConf)
 	defer server.Close()
 
 	reqHeader1 := http.Header{}
@@ -120,7 +123,7 @@ func TestMultipleResponses(t *testing.T) {
 		Headers: reqHeader1,
 	}
 
-	serverResponse := gotesthttp.DoRequest(testHost, testPort, clientRequest1)
+	serverResponse := gotesthttp.DoRequest(defaultConf.Host, defaultConf.Port, clientRequest1)
 	if !compareResponses(t, &configuredResponse1, serverResponse) {
 		return
 	}
@@ -138,7 +141,7 @@ func TestMultipleResponses(t *testing.T) {
 		Headers: reqHeader2,
 	}
 
-	serverResponse = gotesthttp.DoRequest(testHost, testPort, clientRequest2)
+	serverResponse = gotesthttp.DoRequest(defaultConf.Host, defaultConf.Port, clientRequest2)
 	if !compareResponses(t, &configuredResponse2, serverResponse) {
 		return
 	}
@@ -156,7 +159,8 @@ func compareResponses(t *testing.T, r1 *gotesthttp.ResponseData, r2 *gotesthttp.
 	result = result && containsHeaders(t, r1.Headers, r2.Headers)
 	result = result && assert.Equal(t, r1.Method, r2.Method, "same method expected")
 	result = result && assert.Equal(t, r1.Status, r2.Status, "same status expected")
-	result = result && assert.Equal(t, r1.URI, r2.URI, "same URI expected")
+	result = result && assert.Equal(t, defaultConf.Host, r2.Host, "same URI expected")
+	result = result && assert.Equal(t, defaultConf.Port, r2.Port, "same URI expected")
 
 	return result
 }
@@ -170,6 +174,8 @@ func compareRequests(t *testing.T, r1 *gotesthttp.RequestData, r2 *gotesthttp.Re
 	result = result && containsHeaders(t, r1.Headers, r2.Headers)
 	result = result && assert.Equal(t, r1.Method, r2.Method, "same method expected")
 	result = result && assert.Equal(t, r1.URI, r2.URI, "same URI expected")
+	result = result && assert.Equal(t, defaultConf.Host, r2.Host, "same URI expected")
+	result = result && assert.Equal(t, defaultConf.Port, r2.Port, "same URI expected")
 
 	return result
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jinzhu/copier"
 	utils "github.com/uol/gotest/utils"
 )
 
@@ -62,13 +63,16 @@ func NewTCPServer(configuration *TCPConfiguration, start bool) (*TCPServer, int)
 		panic(err)
 	}
 
+	confCopy := TCPConfiguration{}
+	copier.Copy(&confCopy, configuration)
+
 	server := &TCPServer{
 		server: server{
 			messageChannel: make(chan MessageData, configuration.MessageChannelSize),
 			port:           port,
 		},
 		listener:      listener,
-		configuration: configuration,
+		configuration: &confCopy,
 	}
 
 	if start {
@@ -161,6 +165,8 @@ func (ts *TCPServer) handleConnection(conn net.Conn) {
 	ts.messageChannel <- MessageData{
 		Message: buffer.String(),
 		Date:    time.Now(),
+		Host:    ts.configuration.Host,
+		Port:    ts.port,
 	}
 }
 

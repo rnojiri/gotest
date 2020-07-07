@@ -3,7 +3,9 @@ package http
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -53,6 +55,16 @@ func parseResponse(res *http.Response, reqDate time.Time) (*ResponseData, error)
 		return nil, err
 	}
 
+	host, portStr, err := net.SplitHostPort(res.Request.Host)
+	if err != nil {
+		return nil, err
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return nil, err
+	}
+
 	return &ResponseData{
 		RequestData: RequestData{
 			URI:     res.Request.RequestURI,
@@ -60,6 +72,8 @@ func parseResponse(res *http.Response, reqDate time.Time) (*ResponseData, error)
 			Headers: res.Header,
 			Method:  res.Request.Method,
 			Date:    reqDate,
+			Host:    host,
+			Port:    port,
 		},
 		Status: res.StatusCode,
 	}, nil

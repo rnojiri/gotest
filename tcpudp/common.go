@@ -13,6 +13,8 @@ const listenRetries int = 10
 type MessageData struct {
 	Message string
 	Date    time.Time
+	Host    string
+	Port    int
 }
 
 // ServerConfiguration - common configuration

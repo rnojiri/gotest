@@ -79,6 +79,7 @@ func TestUDPOneMessage(t *testing.T) {
 	}
 
 	payload := "test"
+	now := time.Now()
 
 	err = tcpudp.WriteUDP(conn, payload)
 	if !assert.NoError(t, err, "expected no error writing") {
@@ -86,7 +87,7 @@ func TestUDPOneMessage(t *testing.T) {
 	}
 
 	message := <-s.MessageChannel()
-	if !assert.Equal(t, payload, message.Message, "expected same value") {
+	if !testMessage(t, &message, payload, port, now) {
 		return
 	}
 
@@ -109,12 +110,15 @@ func TestUDPMultipleMessages(t *testing.T) {
 
 	messageFormat := "test%d"
 	numMessages := gotest.RandomInt(2, 10)
-	messages := make([]string, numMessages)
+	payloads := make([]string, numMessages)
+	times := make([]time.Time, numMessages)
+
 	for i := 0; i < numMessages; i++ {
 
-		messages[i] = fmt.Sprintf(messageFormat, i)
+		payloads[i] = fmt.Sprintf(messageFormat, i)
+		times[i] = time.Now()
 
-		err = tcpudp.WriteUDP(conn, messages[i])
+		err = tcpudp.WriteUDP(conn, payloads[i])
 		if !assert.NoError(t, err, "expected no error writing") {
 			return
 		}
@@ -123,7 +127,7 @@ func TestUDPMultipleMessages(t *testing.T) {
 	for i := 0; i < numMessages; i++ {
 
 		message := <-s.MessageChannel()
-		if !assert.Equal(t, messages[i], message.Message, "expected same message") {
+		if !testMessage(t, &message, payloads[i], port, times[i]) {
 			return
 		}
 	}

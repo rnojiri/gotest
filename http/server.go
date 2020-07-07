@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"regexp"
 	"time"
+
+	"github.com/jinzhu/copier"
 )
 
 /**
@@ -22,6 +24,8 @@ type RequestData struct {
 	Method  string
 	Headers http.Header
 	Date    time.Time
+	Host    string
+	Port    int
 }
 
 // ResponseData - the expected response data for each configured URI
@@ -36,36 +40,53 @@ type Server struct {
 	requestChannel chan *RequestData
 	responseMap    map[string]ResponseData
 	errors         []error
+	configuration  *Configuration
+}
+
+// Configuration - configuration
+type Configuration struct {
+	Host        string
+	Port        int
+	ChannelSize int
+	Responses   []ResponseData
 }
 
 var multipleBarRegexp = regexp.MustCompile("[/]+")
 
 // NewServer - creates a new HTTP listener server
-func NewServer(host string, port, channelSize int, responses []ResponseData) *Server {
+func NewServer(configuration *Configuration) *Server {
 
-	if len(responses) == 0 {
+	if configuration == nil {
+		panic(fmt.Errorf("null configuration"))
+	}
+
+	if len(configuration.Responses) == 0 {
 		panic(fmt.Errorf("expected at least one response"))
 	}
 
 	hs := &Server{
-		requestChannel: make(chan *RequestData, channelSize),
+		requestChannel: make(chan *RequestData, configuration.ChannelSize),
 	}
 
 	hs.responseMap = map[string]ResponseData{}
-	for _, response := range responses {
+	for _, response := range configuration.Responses {
 		response.URI = CleanURI(response.URI)
 		hs.responseMap[response.URI] = response
 	}
 
 	hs.server = httptest.NewUnstartedServer(http.HandlerFunc(hs.handler))
 
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", configuration.Host, configuration.Port))
 	if err != nil {
 		panic(err)
 	}
 
+	confCopy := Configuration{}
+	copier.Copy(&confCopy, configuration)
+
 	hs.server.Listener = listener
 	hs.server.Start()
+	hs.configuration = &confCopy
 
 	return hs
 }
@@ -105,6 +126,8 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 		Headers: req.Header,
 		Method:  req.Method,
 		Date:    time.Now(),
+		Host:    hs.configuration.Host,
+		Port:    hs.configuration.Port,
 	}
 }
 

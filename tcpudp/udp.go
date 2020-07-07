@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jinzhu/copier"
 	utils "github.com/uol/gotest/utils"
 )
 
@@ -53,13 +54,16 @@ func NewUDPServer(configuration *ServerConfiguration, start bool) (*UDPServer, i
 		panic(err)
 	}
 
+	confCopy := ServerConfiguration{}
+	copier.Copy(&confCopy, configuration)
+
 	server := &UDPServer{
 		server: server{
 			messageChannel: make(chan MessageData, configuration.MessageChannelSize),
 			port:           port,
 		},
 		listener:      listener,
-		configuration: configuration,
+		configuration: &confCopy,
 	}
 
 	if start {
@@ -117,6 +121,8 @@ func (us *UDPServer) handlePacket(buffer []byte) {
 	us.messageChannel <- MessageData{
 		Message: string(buffer),
 		Date:    time.Now(),
+		Host:    us.configuration.Host,
+		Port:    us.port,
 	}
 }
 
