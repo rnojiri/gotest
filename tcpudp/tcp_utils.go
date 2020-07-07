@@ -39,7 +39,7 @@ func ConnectTCP(host string, port int, deadline time.Duration) (*net.TCPConn, er
 }
 
 // WriteTCP - writes to the connection
-func WriteTCP(connection *net.TCPConn, payload string) error {
+func WriteTCP(connection *net.TCPConn, payload string, endAfter bool) error {
 
 	_, err := connection.Write(([]byte)(payload))
 	if err != nil {
@@ -47,6 +47,10 @@ func WriteTCP(connection *net.TCPConn, payload string) error {
 	}
 
 	<-time.After(milisBetweenWrites * time.Millisecond)
+
+	if endAfter {
+		connection.Close()
+	}
 
 	return nil
 }

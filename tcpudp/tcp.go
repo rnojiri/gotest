@@ -3,6 +3,7 @@ package tcpudp
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"time"
@@ -132,6 +133,10 @@ func (ts *TCPServer) handleConnection(conn net.Conn) {
 				if nErr.Timeout() {
 					break
 				}
+			}
+
+			if err == io.EOF {
+				break
 			}
 
 			ts.errors = append(ts.errors, err)

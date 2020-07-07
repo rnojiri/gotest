@@ -114,7 +114,7 @@ func TestTCPOneMessage(t *testing.T) {
 	payload := "test"
 	now := time.Now()
 
-	err = tcpudp.WriteTCP(conn, payload)
+	err = tcpudp.WriteTCP(conn, payload, true)
 	if !assert.NoError(t, err, "expected no error writing") {
 		return
 	}
@@ -127,8 +127,8 @@ func TestTCPOneMessage(t *testing.T) {
 	assert.Len(t, s.GetErrors(), 0, "expected no errors")
 }
 
-// TestTCPMultipleMessages - tests the server with multiple messages
-func TestTCPMultipleMessages(t *testing.T) {
+// TestTCPMultipleMessagesSameConn - tests the server with multiple messages using same connection
+func TestTCPMultipleMessagesSameConn(t *testing.T) {
 
 	s, port := mustCreateTCPServer(true, time.Second)
 	defer s.Stop()
@@ -141,11 +141,13 @@ func TestTCPMultipleMessages(t *testing.T) {
 		return
 	}
 
-	messageFormat := "test%d\n"
+	defer conn.Close()
+
+	payloadFormat := "test%d\n"
 	numMessages := gotest.RandomInt(2, 10)
 	for i := 0; i < numMessages; i++ {
-		payload := fmt.Sprintf(messageFormat, i)
-		err = tcpudp.WriteTCP(conn, payload)
+		payload := fmt.Sprintf(payloadFormat, i)
+		err = tcpudp.WriteTCP(conn, payload, false)
 		if !assert.NoError(t, err, "expected no error writing") {
 			return
 		}
@@ -160,8 +162,48 @@ func TestTCPMultipleMessages(t *testing.T) {
 	}
 
 	for i := 0; i < numMessages; i++ {
-		expected := fmt.Sprintf(messageFormat, i)
+		expected := fmt.Sprintf(payloadFormat, i)
 		if !assert.Equal(t, expected, messages[i]+"\n", "expected same message") {
+			return
+		}
+	}
+
+	assert.Len(t, s.GetErrors(), 0, "expected no errors")
+}
+
+// TestTCPMultipleMessagesMultiConn - tests the server with multiple messages using multiple connections
+func TestTCPMultipleMessagesMultiConn(t *testing.T) {
+
+	s, port := mustCreateTCPServer(true, time.Second)
+	defer s.Stop()
+	if s == nil {
+		return
+	}
+
+	payloadFormat := "test%d\n"
+	numMessages := gotest.RandomInt(5, 10)
+	payloadArray := make([]string, numMessages)
+	timeArray := make([]time.Time, numMessages)
+
+	for i := 0; i < numMessages; i++ {
+
+		conn, err := tcpudp.ConnectTCP(testHost, port, time.Second)
+		if !assert.NoError(t, err, "expected no error connecting") {
+			return
+		}
+
+		timeArray[i] = time.Now()
+		payloadArray[i] = fmt.Sprintf(payloadFormat, i)
+		err = tcpudp.WriteTCP(conn, payloadArray[i], true)
+		if !assert.NoError(t, err, "expected no error writing") {
+			return
+		}
+	}
+
+	for i := 0; i < numMessages; i++ {
+
+		message := <-s.MessageChannel()
+		if !testMessage(t, &message, payloadArray[i], port, timeArray[i]) {
 			return
 		}
 	}
@@ -187,10 +229,12 @@ func TestTCPServerResponse(t *testing.T) {
 		return
 	}
 
+	defer conn.Close()
+
 	payload := "request"
 	now := time.Now()
 
-	err = tcpudp.WriteTCP(conn, payload)
+	err = tcpudp.WriteTCP(conn, payload, false)
 	if !assert.NoError(t, err, "expected no error writing") {
 		return
 	}
