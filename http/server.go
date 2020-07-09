@@ -116,12 +116,12 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	combinedHeaders := res.Header()
+	combinedHeaders := http.Header{}
+	CopyHeaders(responseData.Headers, &combinedHeaders)
 
-	CopyHeaders(responseData.Headers, combinedHeaders)
-	CopyHeaders(req.Header, combinedHeaders)
-
-	res.WriteHeader(responseData.Status)
+	if responseData.Status != http.StatusOK {
+		res.WriteHeader(responseData.Status)
+	}
 
 	if len(responseData.Body) > 0 {
 		_, err := res.Write([]byte(responseData.Body))

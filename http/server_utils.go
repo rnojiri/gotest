@@ -28,7 +28,7 @@ func DoRequest(testServerHost string, testServerPort int, request *RequestData) 
 	}
 
 	if len(request.Headers) > 0 {
-		CopyHeaders(request.Headers, req.Header)
+		CopyHeaders(request.Headers, &req.Header)
 	}
 
 	res, err := client.Do(req)
@@ -106,7 +106,7 @@ func WaitForServerRequest(server *Server, waitFor, maxRequestTimeout time.Durati
 }
 
 // CopyHeaders - copy all the headers
-func CopyHeaders(source http.Header, dest http.Header) {
+func CopyHeaders(source http.Header, dest *http.Header) {
 
 	if len(source) > 0 {
 		for header, valueList := range source {
