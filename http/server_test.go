@@ -2,9 +2,11 @@ package http_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
+	randomdata "github.com/Pallinder/go-randomdata"
 	"github.com/stretchr/testify/assert"
 	gotesthttp "github.com/uol/gotest/http"
 )
@@ -25,12 +27,13 @@ func createDummyResponse() gotesthttp.ResponseData {
 
 	headers := http.Header{}
 	headers.Add("Content-type", "text/plain; charset=utf-8")
+	headers.Add("X-custom", randomdata.Adjective())
 
 	return gotesthttp.ResponseData{
 		RequestData: gotesthttp.RequestData{
-			URI:     "/test",
-			Body:    "test body",
-			Method:  "GET",
+			URI:     "/" + strings.ToLower(randomdata.SillyName()),
+			Body:    randomdata.City(),
+			Method:  randomdata.StringSample("GET", "POST", "PUT"),
 			Headers: headers,
 		},
 		Status: http.StatusOK,
@@ -40,7 +43,10 @@ func createDummyResponse() gotesthttp.ResponseData {
 // Test404 - tests when a non mapped response is called
 func Test404(t *testing.T) {
 
-	defaultConf.Responses = []gotesthttp.ResponseData{createDummyResponse()}
+	defaultConf.Responses = map[string][]gotesthttp.ResponseData{
+		"default": {createDummyResponse()},
+	}
+
 	server := gotesthttp.NewServer(&defaultConf)
 	defer server.Close()
 
@@ -59,8 +65,8 @@ func Test404(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, response.Status, "expected 404 status")
 
 	response = gotesthttp.DoRequest(defaultConf.Host, defaultConf.Port, &gotesthttp.RequestData{
-		URI:    "/test",
-		Method: "GET",
+		URI:    defaultConf.Responses["default"][0].URI,
+		Method: defaultConf.Responses["default"][0].Method,
 	})
 
 	assert.Equal(t, http.StatusOK, response.Status, "expected 200 status")
@@ -69,23 +75,22 @@ func Test404(t *testing.T) {
 // TestSuccess - tests when everything goes right
 func TestSuccess(t *testing.T) {
 
-	defaultConf.Responses = []gotesthttp.ResponseData{createDummyResponse()}
+	defaultConf.Responses = map[string][]gotesthttp.ResponseData{
+		"default": {createDummyResponse()},
+	}
 
 	server := gotesthttp.NewServer(&defaultConf)
 	defer server.Close()
 
-	reqHeader := http.Header{}
-	reqHeader.Add("Content-type", "text/plain; charset=utf-8")
-
 	clientRequest := &gotesthttp.RequestData{
-		URI:     "/test",
-		Body:    "test body",
-		Method:  "GET",
-		Headers: reqHeader,
+		URI:     defaultConf.Responses["default"][0].URI,
+		Body:    defaultConf.Responses["default"][0].Body,
+		Method:  defaultConf.Responses["default"][0].Method,
+		Headers: defaultConf.Responses["default"][0].Headers,
 	}
 
 	serverResponse := gotesthttp.DoRequest(defaultConf.Host, defaultConf.Port, clientRequest)
-	if !compareResponses(t, &defaultConf.Responses[0], serverResponse) {
+	if !compareResponses(t, &defaultConf.Responses["default"][0], serverResponse) {
 		return
 	}
 
@@ -108,19 +113,18 @@ func TestMultipleResponses(t *testing.T) {
 	configuredResponse2.Headers.Del("Content-type")
 	configuredResponse2.Headers.Set("Content-type", "application/json")
 
-	defaultConf.Responses = []gotesthttp.ResponseData{configuredResponse1, configuredResponse2}
+	defaultConf.Responses = map[string][]gotesthttp.ResponseData{
+		"default": {configuredResponse1, configuredResponse2},
+	}
 
 	server := gotesthttp.NewServer(&defaultConf)
 	defer server.Close()
 
-	reqHeader1 := http.Header{}
-	reqHeader1.Set("Content-type", "text/plain; charset=utf-8")
-
 	clientRequest1 := &gotesthttp.RequestData{
-		URI:     "/text",
-		Body:    "some text",
-		Method:  "POST",
-		Headers: reqHeader1,
+		URI:     configuredResponse1.URI,
+		Body:    configuredResponse1.Body,
+		Method:  configuredResponse1.Method,
+		Headers: configuredResponse1.Headers,
 	}
 
 	serverResponse := gotesthttp.DoRequest(defaultConf.Host, defaultConf.Port, clientRequest1)
@@ -131,14 +135,11 @@ func TestMultipleResponses(t *testing.T) {
 	serverRequest := gotesthttp.WaitForServerRequest(server, time.Second, 10*time.Second)
 	compareRequests(t, clientRequest1, serverRequest)
 
-	reqHeader2 := http.Header{}
-	reqHeader2.Set("Content-type", "application/json")
-
 	clientRequest2 := &gotesthttp.RequestData{
-		URI:     "/json",
-		Body:    `{"metric": "test-metric", "value": 1.0}`,
-		Method:  "PUT",
-		Headers: reqHeader2,
+		URI:     configuredResponse2.URI,
+		Body:    configuredResponse2.Body,
+		Method:  configuredResponse2.Method,
+		Headers: configuredResponse2.Headers,
 	}
 
 	serverResponse = gotesthttp.DoRequest(defaultConf.Host, defaultConf.Port, clientRequest2)
@@ -201,4 +202,56 @@ func containsHeaders(t *testing.T, mustExist, fullSet http.Header) bool {
 	}
 
 	return true
+}
+
+// TestSuccessMultiModes - tests when everything goes right
+func TestSuccessMultiModes(t *testing.T) {
+
+	r1 := createDummyResponse()
+	r2 := createDummyResponse()
+
+	defaultConf.Responses = map[string][]gotesthttp.ResponseData{
+		"mode1": {r1},
+		"mode2": {r2},
+	}
+
+	server := gotesthttp.NewServer(&defaultConf)
+	defer server.Close()
+
+	reqHeader := http.Header{}
+	reqHeader.Add("Content-type", "text/plain; charset=utf-8")
+
+	clientRequest1 := &gotesthttp.RequestData{
+		URI:     r1.URI,
+		Body:    r1.Body,
+		Method:  r1.Method,
+		Headers: r1.Headers,
+	}
+
+	clientRequest2 := &gotesthttp.RequestData{
+		URI:     r2.URI,
+		Body:    r2.Body,
+		Method:  r2.Method,
+		Headers: r2.Headers,
+	}
+
+	server.SetMode("mode2")
+
+	serverResponse := gotesthttp.DoRequest(defaultConf.Host, defaultConf.Port, clientRequest2)
+	if !compareResponses(t, &defaultConf.Responses["mode2"][0], serverResponse) {
+		return
+	}
+
+	serverRequest := gotesthttp.WaitForServerRequest(server, time.Second, 10*time.Second)
+	compareRequests(t, clientRequest2, serverRequest)
+
+	server.SetMode("mode1")
+
+	serverResponse = gotesthttp.DoRequest(defaultConf.Host, defaultConf.Port, clientRequest1)
+	if !compareResponses(t, &defaultConf.Responses["mode1"][0], serverResponse) {
+		return
+	}
+
+	serverRequest = gotesthttp.WaitForServerRequest(server, time.Second, 10*time.Second)
+	compareRequests(t, clientRequest1, serverRequest)
 }

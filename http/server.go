@@ -38,9 +38,10 @@ type ResponseData struct {
 type Server struct {
 	server         *httptest.Server
 	requestChannel chan *RequestData
-	responseMap    map[string]ResponseData
+	responseMap    map[string]map[string]ResponseData
 	errors         []error
 	configuration  *Configuration
+	mode           string
 }
 
 // Configuration - configuration
@@ -48,7 +49,7 @@ type Configuration struct {
 	Host        string
 	Port        int
 	ChannelSize int
-	Responses   []ResponseData
+	Responses   map[string][]ResponseData
 }
 
 var multipleBarRegexp = regexp.MustCompile("[/]+")
@@ -68,10 +69,16 @@ func NewServer(configuration *Configuration) *Server {
 		requestChannel: make(chan *RequestData, configuration.ChannelSize),
 	}
 
-	hs.responseMap = map[string]ResponseData{}
-	for _, response := range configuration.Responses {
-		response.URI = CleanURI(response.URI)
-		hs.responseMap[response.URI] = response
+	hs.responseMap = map[string]map[string]ResponseData{}
+	for mode, responses := range configuration.Responses {
+
+		hs.responseMap[mode] = map[string]ResponseData{}
+		for _, response := range responses {
+			response.URI = CleanURI(response.URI)
+			hs.responseMap[mode][response.URI] = response
+		}
+
+		hs.mode = mode
 	}
 
 	hs.server = httptest.NewUnstartedServer(http.HandlerFunc(hs.handler))
@@ -96,7 +103,14 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 
 	cleanURI := CleanURI(req.RequestURI)
 
-	responseData, ok := hs.responseMap[cleanURI]
+	modeMaps, ok := hs.responseMap[hs.mode]
+	if !ok {
+		hs.errors = append(hs.errors, fmt.Errorf("no mode named: %s", hs.mode))
+		res.WriteHeader(http.StatusFailedDependency)
+		return
+	}
+
+	responseData, ok := modeMaps[cleanURI]
 	if !ok || responseData.Method != req.Method {
 		res.WriteHeader(http.StatusNotFound)
 		return
@@ -143,4 +157,10 @@ func (hs *Server) Close() {
 func (hs *Server) RequestChannel() <-chan *RequestData {
 
 	return hs.requestChannel
+}
+
+// SetMode - sets the server mode
+func (hs *Server) SetMode(mode string) {
+
+	hs.mode = mode
 }
