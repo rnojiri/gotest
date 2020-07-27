@@ -1,6 +1,7 @@
 package http_test
 
 import (
+	"math"
 	"net/http"
 	"strings"
 	"testing"
@@ -254,4 +255,43 @@ func TestSuccessMultiModes(t *testing.T) {
 
 	serverRequest = gotesthttp.WaitForServerRequest(server, time.Second, 10*time.Second)
 	compareRequests(t, clientRequest1, serverRequest)
+}
+
+// TestWaitResponse - tests the wait parameter
+func TestWaitResponse(t *testing.T) {
+
+	randomSeconds := randomdata.Number(1, 5)
+
+	resp := createDummyResponse()
+	resp.Wait = time.Duration(randomSeconds) * time.Second
+
+	defaultConf.Responses = map[string][]gotesthttp.ResponseData{
+		"default": {resp},
+	}
+
+	server := gotesthttp.NewServer(&defaultConf)
+	defer server.Close()
+
+	clientRequest := &gotesthttp.RequestData{
+		URI:     defaultConf.Responses["default"][0].URI,
+		Body:    defaultConf.Responses["default"][0].Body,
+		Method:  defaultConf.Responses["default"][0].Method,
+		Headers: defaultConf.Responses["default"][0].Headers,
+	}
+
+	start := time.Now()
+
+	serverResponse := gotesthttp.DoRequest(defaultConf.Host, defaultConf.Port, clientRequest)
+	if !compareResponses(t, &defaultConf.Responses["default"][0], serverResponse) {
+		return
+	}
+
+	requestTime := time.Since(start)
+
+	if !assert.EqualValues(t, float64(randomSeconds), math.Floor(requestTime.Seconds()), "expected same amount of time") {
+		return
+	}
+
+	serverRequest := gotesthttp.WaitForServerRequest(server, time.Duration(randomSeconds+1)*time.Second, 10*time.Second)
+	compareRequests(t, clientRequest, serverRequest)
 }

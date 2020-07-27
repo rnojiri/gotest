@@ -20,7 +20,7 @@ import (
 // DoRequest - does a request
 func DoRequest(testServerHost string, testServerPort int, request *RequestData) *ResponseData {
 
-	client := funks.CreateHTTPClient(time.Second, true)
+	client := funks.CreateHTTPClient(10*time.Second, true)
 
 	req, err := http.NewRequest(request.Method, fmt.Sprintf("http://%s:%d/%s", testServerHost, testServerPort, request.URI), bytes.NewBuffer([]byte(request.Body)))
 	if err != nil {
@@ -106,12 +106,12 @@ func WaitForServerRequest(server *Server, waitFor, maxRequestTimeout time.Durati
 }
 
 // CopyHeaders - copy all the headers
-func CopyHeaders(source http.Header, dest *http.Header) {
+func CopyHeaders(source http.Header, headers *http.Header) {
 
 	if len(source) > 0 {
 		for header, valueList := range source {
 			for _, v := range valueList {
-				dest.Set(header, v)
+				headers.Add(header, v)
 			}
 		}
 	}

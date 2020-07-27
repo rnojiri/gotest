@@ -32,6 +32,7 @@ type RequestData struct {
 type ResponseData struct {
 	RequestData
 	Status int
+	Wait   time.Duration
 }
 
 // Server - the server listening for HTTP requests
@@ -116,8 +117,12 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	combinedHeaders := http.Header{}
-	CopyHeaders(responseData.Headers, &combinedHeaders)
+	if responseData.Wait != 0 {
+		time.Sleep(responseData.Wait)
+	}
+
+	headers := res.Header()
+	CopyHeaders(responseData.Headers, &headers)
 
 	if responseData.Status != http.StatusOK {
 		res.WriteHeader(responseData.Status)
@@ -137,7 +142,7 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 	hs.requestChannel <- &RequestData{
 		URI:     cleanURI,
 		Body:    bufferReqBody.String(),
-		Headers: req.Header,
+		Headers: headers,
 		Method:  req.Method,
 		Date:    time.Now(),
 		Host:    hs.configuration.Host,
