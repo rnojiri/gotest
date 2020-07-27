@@ -2,14 +2,13 @@ package http
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/uol/funks"
 )
 
 /**
@@ -20,7 +19,14 @@ import (
 // DoRequest - does a request
 func DoRequest(testServerHost string, testServerPort int, request *RequestData) *ResponseData {
 
-	client := funks.CreateHTTPClient(10*time.Second, true)
+	transportCore := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	client := &http.Client{
+		Transport: transportCore,
+		Timeout:   10 * time.Second,
+	}
 
 	req, err := http.NewRequest(request.Method, fmt.Sprintf("http://%s:%d/%s", testServerHost, testServerPort, request.URI), bytes.NewBuffer([]byte(request.Body)))
 	if err != nil {
