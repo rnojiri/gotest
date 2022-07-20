@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
-	"net"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -17,7 +15,7 @@ import (
 **/
 
 // DoRequest - does a request
-func DoRequest(testServerHost string, testServerPort int, request *RequestData) *ResponseData {
+func (hs *Server) DoRequest(request *Request) *http.Response {
 
 	transportCore := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -28,72 +26,35 @@ func DoRequest(testServerHost string, testServerPort int, request *RequestData) 
 		Timeout:   10 * time.Second,
 	}
 
-	req, err := http.NewRequest(request.Method, fmt.Sprintf("http://%s:%d/%s", testServerHost, testServerPort, request.URI), bytes.NewBuffer([]byte(request.Body)))
+	req, err := http.NewRequest(
+		request.Method,
+		fmt.Sprintf("http://%s:%d/%s", hs.configuration.Host, hs.configuration.Port, request.URI),
+		bytes.NewBuffer(request.Body),
+	)
 	if err != nil {
-		panic(err)
+		hs.configuration.T.Fatalf("error creating a new request: %v", err)
 	}
 
-	if len(request.Headers) > 0 {
-		CopyHeaders(request.Headers, &req.Header)
-	}
+	req.Header = request.Headers
 
 	res, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		hs.configuration.T.Fatalf("error executing request: %v", err)
 	}
 
-	result, err := parseResponse(res, request.Date)
-	if err != nil {
-		panic(err)
-	}
-
-	result.URI = request.URI
-
-	return result
-}
-
-// parseResponse - parses the response using the local struct as result
-func parseResponse(res *http.Response, reqDate time.Time) (*ResponseData, error) {
-
-	bufferReqBody := new(bytes.Buffer)
-	_, err := bufferReqBody.ReadFrom(res.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	host, portStr, err := net.SplitHostPort(res.Request.Host)
-	if err != nil {
-		return nil, err
-	}
-
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ResponseData{
-		RequestData: RequestData{
-			URI:     res.Request.RequestURI,
-			Body:    bufferReqBody.String(),
-			Headers: res.Header,
-			Method:  res.Request.Method,
-			Date:    reqDate,
-			Host:    host,
-			Port:    port,
-		},
-		Status: res.StatusCode,
-	}, nil
+	return res
 }
 
 // WaitForServerRequest - wait until timeout or for the server sets the request in the channel
-func WaitForServerRequest(server *Server, waitFor, maxRequestTimeout time.Duration) *RequestData {
+func WaitForServerRequest(server *Server, waitFor, maxRequestTimeout time.Duration) *Request {
 
-	var request *RequestData
+	var request *Request
 	start := time.Now()
 
 	for {
 		select {
 		case request = <-server.RequestChannel():
+
 		default:
 		}
 
@@ -111,14 +72,13 @@ func WaitForServerRequest(server *Server, waitFor, maxRequestTimeout time.Durati
 	return request
 }
 
-// CopyHeaders - copy all the headers
-func CopyHeaders(source http.Header, headers *http.Header) {
+// AddHeaders - copy all the headers
+func AddHeaders(dest http.Header, source http.Header) {
 
-	if len(source) > 0 {
-		for header, valueList := range source {
-			for _, v := range valueList {
-				headers.Add(header, v)
-			}
+	for header, valueList := range source {
+
+		for _, v := range valueList {
+			dest.Add(header, v)
 		}
 	}
 }

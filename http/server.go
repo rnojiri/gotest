@@ -2,11 +2,14 @@ package http
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"strconv"
+	"testing"
 	"time"
 
 	"github.com/jinzhu/copier"
@@ -17,29 +20,39 @@ import (
 * @author rnojiri
 **/
 
-// RequestData - the request data sent to the server
-type RequestData struct {
+// Request - the request data made to the server
+type Request struct {
 	URI     string
-	Body    string
+	Body    []byte
 	Method  string
 	Headers http.Header
-	Date    time.Time
-	Host    string
-	Port    int
 }
 
-// ResponseData - the expected response data for each configured URI
-type ResponseData struct {
-	RequestData
+// Response - the endpoint response data
+type Response struct {
+	// Body - the body to be put in the response
+	Body interface{}
+	// Headers - the headers to be included in the response
+	Headers http.Header
+	// Status - the code status to be returned
 	Status int
-	Wait   time.Duration
+	// Wait - a time to wait until responds
+	Wait time.Duration
+}
+
+// Endpoint - an endpoint to be listened
+type Endpoint struct {
+	// URI - the endpoint's uri
+	URI string
+	// Methods - the list of http methods (GET, POST, ...) containing the respective response
+	Methods map[string]Response
 }
 
 // Server - the server listening for HTTP requests
 type Server struct {
 	server         *httptest.Server
-	requestChannel chan *RequestData
-	responseMap    map[string]map[string]ResponseData
+	requestChannel chan *Request
+	responseMap    map[string]map[string]Endpoint
 	errors         []error
 	configuration  *Configuration
 	mode           string
@@ -50,7 +63,8 @@ type Configuration struct {
 	Host        string
 	Port        int
 	ChannelSize int
-	Responses   map[string][]ResponseData
+	Responses   map[string][]Endpoint
+	T           *testing.T
 }
 
 var multipleBarRegexp = regexp.MustCompile("[/]+")
@@ -67,13 +81,13 @@ func NewServer(configuration *Configuration) *Server {
 	}
 
 	hs := &Server{
-		requestChannel: make(chan *RequestData, configuration.ChannelSize),
+		requestChannel: make(chan *Request, configuration.ChannelSize),
 	}
 
-	hs.responseMap = map[string]map[string]ResponseData{}
+	hs.responseMap = map[string]map[string]Endpoint{}
 	for mode, responses := range configuration.Responses {
 
-		hs.responseMap[mode] = map[string]ResponseData{}
+		hs.responseMap[mode] = map[string]Endpoint{}
 		for _, response := range responses {
 			response.URI = CleanURI(response.URI)
 			hs.responseMap[mode][response.URI] = response
@@ -106,30 +120,48 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 
 	modeMaps, ok := hs.responseMap[hs.mode]
 	if !ok {
-		hs.errors = append(hs.errors, fmt.Errorf("no mode named: %s", hs.mode))
-		res.WriteHeader(http.StatusFailedDependency)
-		return
+		hs.configuration.T.Fatalf("there is no configuration set with name: %s", hs.mode)
 	}
 
-	responseData, ok := modeMaps[cleanURI]
-	if !ok || responseData.Method != req.Method {
+	endpoint, ok := modeMaps[cleanURI]
+	if !ok {
 		res.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	if responseData.Wait != 0 {
-		time.Sleep(responseData.Wait)
+	response, ok := endpoint.Methods[req.Method]
+	if !ok {
+		res.WriteHeader(http.StatusNotFound)
+		return
 	}
 
-	headers := res.Header()
-	CopyHeaders(responseData.Headers, &headers)
-
-	if responseData.Status != http.StatusOK {
-		res.WriteHeader(responseData.Status)
+	if response.Wait != 0 {
+		time.Sleep(response.Wait)
 	}
 
-	if len(responseData.Body) > 0 {
-		_, err := res.Write([]byte(responseData.Body))
+	AddHeaders(res.Header(), response.Headers)
+
+	res.WriteHeader(response.Status)
+
+	if response.Body != nil {
+
+		var inBytes []byte
+		var err error
+		switch response.Body.(type) {
+		case int:
+			inBytes = []byte(strconv.FormatInt(int64(response.Body.(int)), 10))
+		case string:
+			inBytes = []byte(response.Body.(string))
+		case bool:
+			inBytes = []byte(strconv.FormatBool(response.Body.(bool)))
+		default:
+			inBytes, err = json.Marshal(response.Body)
+			if err != nil {
+				hs.configuration.T.Fatalf("error marshaling json: %v", err)
+			}
+		}
+
+		_, err = res.Write(inBytes)
 		if err != nil {
 			hs.errors = append(hs.errors, err)
 			return
@@ -137,16 +169,16 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	bufferReqBody := new(bytes.Buffer)
-	bufferReqBody.ReadFrom(req.Body)
+	_, err := bufferReqBody.ReadFrom(req.Body)
+	if err != nil {
+		hs.configuration.T.Fatalf("error reading request body: %v", err)
+	}
 
-	hs.requestChannel <- &RequestData{
+	hs.requestChannel <- &Request{
 		URI:     cleanURI,
-		Body:    bufferReqBody.String(),
-		Headers: headers,
+		Body:    bufferReqBody.Bytes(),
+		Headers: res.Header(),
 		Method:  req.Method,
-		Date:    time.Now(),
-		Host:    hs.configuration.Host,
-		Port:    hs.configuration.Port,
 	}
 }
 
@@ -155,11 +187,12 @@ func (hs *Server) Close() {
 
 	if hs.server != nil {
 		hs.server.Close()
+		close(hs.requestChannel)
 	}
 }
 
 // RequestChannel - reads from the request channel
-func (hs *Server) RequestChannel() <-chan *RequestData {
+func (hs *Server) RequestChannel() <-chan *Request {
 
 	return hs.requestChannel
 }
