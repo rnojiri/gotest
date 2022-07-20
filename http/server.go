@@ -46,6 +46,8 @@ type Endpoint struct {
 	URI string
 	// Methods - the list of http methods (GET, POST, ...) containing the respective response
 	Methods map[string]Response
+	// Regexp - activates regular expression for uris
+	Regexp bool
 }
 
 // Server - the server listening for HTTP requests
@@ -120,18 +122,41 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 
 	modeMaps, ok := hs.responseMap[hs.mode]
 	if !ok {
-		hs.configuration.T.Fatalf("there is no configuration set with name: %s", hs.mode)
+		hs.configuration.T.Fatalf("no configuration set with name: %s", hs.mode)
 	}
 
-	endpoint, ok := modeMaps[cleanURI]
-	if !ok {
-		res.WriteHeader(http.StatusNotFound)
-		return
+	var endpoint Endpoint
+	found := false
+
+	for uri, item := range modeMaps {
+
+		if item.Regexp {
+
+			match, err := regexp.MatchString(uri, cleanURI)
+			if err != nil {
+				hs.configuration.T.Fatalf("failed to run regexp: %s", cleanURI)
+			}
+
+			if match {
+				endpoint = item
+				found = true
+				break
+			}
+
+		} else if uri == cleanURI {
+			endpoint = item
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		hs.configuration.T.Fatalf("no enpoint configured with uri: %s", cleanURI)
 	}
 
 	response, ok := endpoint.Methods[req.Method]
 	if !ok {
-		res.WriteHeader(http.StatusNotFound)
+		hs.configuration.T.Fatalf("no method configured under uri: %s", cleanURI)
 		return
 	}
 

@@ -46,40 +46,6 @@ func randomMethod() string {
 	return randomdata.StringSample("GET", "POST", "PUT")
 }
 
-// Test404 - tests when a non mapped response is called
-func Test404(t *testing.T) {
-
-	method := randomMethod()
-
-	defaultConf.Responses = map[string][]gotesthttp.Endpoint{
-		"default": {createDummyEndpoint(method)},
-	}
-
-	server := gotesthttp.NewServer(&defaultConf)
-	defer server.Close()
-
-	response := server.DoRequest(&gotesthttp.Request{
-		URI:    "/not",
-		Method: "GET",
-	})
-
-	assert.Equal(t, http.StatusNotFound, response.StatusCode, "expected 404 status")
-
-	response = server.DoRequest(&gotesthttp.Request{
-		URI:    "/test",
-		Method: "POST",
-	})
-
-	assert.Equal(t, http.StatusNotFound, response.StatusCode, "expected 404 status")
-
-	response = server.DoRequest(&gotesthttp.Request{
-		URI:    defaultConf.Responses["default"][0].URI,
-		Method: method,
-	})
-
-	assert.Equal(t, http.StatusOK, response.StatusCode, "expected 200 status")
-}
-
 func createRequestFromEndpoint(method string, endpoint *gotesthttp.Endpoint) *gotesthttp.Request {
 
 	return &gotesthttp.Request{
@@ -96,6 +62,7 @@ func TestSuccess(t *testing.T) {
 	method := randomMethod()
 	endpoint := createDummyEndpoint(method)
 
+	defaultConf.T = t
 	defaultConf.Responses = map[string][]gotesthttp.Endpoint{
 		"default": {endpoint},
 	}
@@ -136,6 +103,7 @@ func TestMultipleResponses(t *testing.T) {
 		},
 	}
 
+	defaultConf.T = t
 	defaultConf.Responses = map[string][]gotesthttp.Endpoint{
 		"default": {endpoint1, endpoint2},
 	}
@@ -143,12 +111,7 @@ func TestMultipleResponses(t *testing.T) {
 	server := gotesthttp.NewServer(&defaultConf)
 	defer server.Close()
 
-	clientRequest1 := &gotesthttp.Request{
-		URI:     endpoint1.URI,
-		Body:    []byte(endpoint1.Methods[r1Method].Body.(string)),
-		Method:  r1Method,
-		Headers: endpoint1.Methods[r1Method].Headers,
-	}
+	clientRequest1 := createRequestFromEndpoint(r1Method, &endpoint1)
 
 	serverResponse := server.DoRequest(clientRequest1)
 	if !compareResponses(t, endpoint1.Methods[r1Method], serverResponse) {
@@ -158,12 +121,7 @@ func TestMultipleResponses(t *testing.T) {
 	serverRequest := gotesthttp.WaitForServerRequest(server, time.Second, 10*time.Second)
 	compareRequests(t, clientRequest1, serverRequest)
 
-	clientRequest2 := &gotesthttp.Request{
-		URI:     endpoint2.URI,
-		Body:    []byte(endpoint2.Methods[r2Method].Body.(string)),
-		Method:  r2Method,
-		Headers: endpoint2.Methods[r2Method].Headers,
-	}
+	clientRequest2 := createRequestFromEndpoint(r2Method, &endpoint2)
 
 	serverResponse = server.DoRequest(clientRequest2)
 	if !compareResponses(t, endpoint2.Methods[r2Method], serverResponse) {
@@ -236,6 +194,7 @@ func TestSuccessMultiModes(t *testing.T) {
 	endpoint1 := createDummyEndpoint(r1Method)
 	endpoint2 := createDummyEndpoint(r2Method)
 
+	defaultConf.T = t
 	defaultConf.Responses = map[string][]gotesthttp.Endpoint{
 		"mode1": {endpoint1},
 		"mode2": {endpoint2},
@@ -282,6 +241,7 @@ func TestWaitResponse(t *testing.T) {
 	m.Wait = time.Duration(randomMillis*100) * time.Millisecond
 	endpoint.Methods[method] = m
 
+	defaultConf.T = t
 	defaultConf.Responses = map[string][]gotesthttp.Endpoint{
 		"default": {endpoint},
 	}
@@ -306,4 +266,54 @@ func TestWaitResponse(t *testing.T) {
 
 	serverRequest := gotesthttp.WaitForServerRequest(server, time.Duration(randomMillis+1)*time.Second, 10*time.Second)
 	compareRequests(t, clientRequest, serverRequest)
+}
+
+// TestURIRegexp - tests the uri regexp
+func TestURIRegexp(t *testing.T) {
+
+	r1Method := randomMethod()
+	r2Method := randomMethod()
+
+	endpoint1 := createDummyEndpoint(r1Method)
+	endpoint1.URI = "/normal"
+
+	endpoint2 := gotesthttp.Endpoint{
+		URI: "/regexp[0-9]+",
+		Methods: map[string]gotesthttp.Response{
+			r2Method: {
+				Status: http.StatusOK,
+				Body:   "ok",
+			},
+		},
+		Regexp: true,
+	}
+
+	defaultConf.T = t
+	defaultConf.Responses = map[string][]gotesthttp.Endpoint{
+		"default": {endpoint1, endpoint2},
+	}
+
+	server := gotesthttp.NewServer(&defaultConf)
+	defer server.Close()
+
+	clientRequest1 := createRequestFromEndpoint(r1Method, &endpoint1)
+
+	serverResponse := server.DoRequest(clientRequest1)
+	if !compareResponses(t, endpoint1.Methods[r1Method], serverResponse) {
+		return
+	}
+
+	serverRequest := gotesthttp.WaitForServerRequest(server, time.Second, 10*time.Second)
+	compareRequests(t, clientRequest1, serverRequest)
+
+	clientRequest2 := createRequestFromEndpoint(r2Method, &endpoint2)
+	clientRequest2.URI = "/regexp5"
+
+	serverResponse = server.DoRequest(clientRequest2)
+	if !compareResponses(t, endpoint2.Methods[r2Method], serverResponse) {
+		return
+	}
+
+	serverRequest = gotesthttp.WaitForServerRequest(server, time.Second, 10*time.Second)
+	compareRequests(t, clientRequest2, serverRequest)
 }
