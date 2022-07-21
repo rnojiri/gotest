@@ -202,7 +202,7 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 	hs.requestChannel <- &Request{
 		URI:     cleanURI,
 		Body:    bufferReqBody.Bytes(),
-		Headers: res.Header(),
+		Headers: req.Header.Clone(),
 		Method:  req.Method,
 	}
 }
