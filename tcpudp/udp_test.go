@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	tcpudp "github.com/rnojiri/gotest/tcpudp"
+	gotest "github.com/rnojiri/gotest/utils"
 	"github.com/stretchr/testify/assert"
-	tcpudp "github.com/uol/gotest/tcpudp"
-	gotest "github.com/uol/gotest/utils"
 )
 
 //

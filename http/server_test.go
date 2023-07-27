@@ -8,8 +8,8 @@ import (
 	"time"
 
 	randomdata "github.com/Pallinder/go-randomdata"
+	gotesthttp "github.com/rnojiri/gotest/http"
 	"github.com/stretchr/testify/assert"
-	gotesthttp "github.com/uol/gotest/http"
 )
 
 /**

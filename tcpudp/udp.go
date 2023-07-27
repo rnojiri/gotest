@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/jinzhu/copier"
-	utils "github.com/uol/gotest/utils"
+	utils "github.com/rnojiri/gotest/utils"
 )
 
 //
