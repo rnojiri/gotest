@@ -229,7 +229,7 @@ func (hs *Server) RequestChannel() []Request {
 	return hs.requests
 }
 
-func (hs *Server) PopRequest() *Request {
+func (hs *Server) FirstRequest() *Request {
 
 	hs.mutex.Lock()
 	hs.mutex.Unlock()
@@ -238,8 +238,13 @@ func (hs *Server) PopRequest() *Request {
 		return nil
 	}
 
-	req := hs.requests[len(hs.requests)-1]
-	hs.requests = hs.requests[:len(hs.requests)-1]
+	req := hs.requests[0]
+
+	if len(hs.requests) == 0 {
+		hs.requests = []Request{}
+	} else {
+		hs.requests = hs.requests[1:]
+	}
 
 	return &req
 }

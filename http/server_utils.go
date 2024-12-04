@@ -48,7 +48,7 @@ func (hs *Server) DoRequest(request *Request) *http.Response {
 // WaitForServerRequest - wait until timeout or for the server sets the request in the channel
 func WaitForServerRequest(server *Server, waitFor, maxRequestTimeout time.Duration) *Request {
 
-	r := server.PopRequest()
+	r := server.FirstRequest()
 
 	if r != nil {
 		return r
@@ -63,7 +63,7 @@ func WaitForServerRequest(server *Server, waitFor, maxRequestTimeout time.Durati
 			break
 		}
 
-		r := server.PopRequest()
+		r := server.FirstRequest()
 
 		if r != nil {
 			return r
