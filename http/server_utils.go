@@ -48,28 +48,25 @@ func (hs *Server) DoRequest(request *Request) *http.Response {
 // WaitForServerRequest - wait until timeout or for the server sets the request in the channel
 func WaitForServerRequest(server *Server, waitFor, maxRequestTimeout time.Duration) *Request {
 
-	var request *Request
+	if len(server.requests) > 0 {
+		return &server.requests[len(server.requests)-1]
+	}
+
 	start := time.Now()
 
 	for {
-		select {
-		case request = <-server.RequestChannel():
-
-		default:
-		}
-
-		if request != nil {
-			break
-		}
-
 		<-time.After(waitFor)
 
 		if time.Since(start) > maxRequestTimeout {
 			break
 		}
+
+		if len(server.requests) > 0 {
+			return &server.requests[len(server.requests)-1]
+		}
 	}
 
-	return request
+	return nil
 }
 
 // AddHeaders - copy all the headers
