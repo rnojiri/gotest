@@ -229,6 +229,21 @@ func (hs *Server) RequestChannel() []Request {
 	return hs.requests
 }
 
+func (hs *Server) PopRequest() *Request {
+
+	hs.mutex.Lock()
+	hs.mutex.Unlock()
+
+	if len(hs.requests) == 0 {
+		return nil
+	}
+
+	req := hs.requests[len(hs.requests)-1]
+	hs.requests = hs.requests[:len(hs.requests)-1]
+
+	return &req
+}
+
 // SetMode - sets the server mode
 func (hs *Server) SetMode(mode string) {
 
