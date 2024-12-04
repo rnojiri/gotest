@@ -45,6 +45,8 @@ type Response struct {
 type Endpoint struct {
 	// URI - the endpoint's uri
 	URI string
+	// QueryString - the query string format
+	QueryString []string
 	// Methods - the list of http methods (GET, POST, ...) containing the respective response
 	Methods map[string]Response
 	// Regexp - activates regular expression for uris
@@ -128,13 +130,16 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	var endpoint Endpoint
+	var err error
 	found := false
 
 	for uri, item := range modeMaps {
 
+		match := false
+
 		if item.Regexp {
 
-			match, err := regexp.MatchString(uri, cleanURI)
+			match, err = regexp.MatchString(uri, cleanURI)
 			if err != nil {
 				hs.configuration.T.Fatalf("failed to run regexp: %s", cleanURI)
 			}
@@ -144,8 +149,9 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 				found = true
 				break
 			}
+		}
 
-		} else if uri == cleanURI {
+		if !match && uri == cleanURI {
 			endpoint = item
 			found = true
 			break
@@ -196,7 +202,7 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	bufferReqBody := new(bytes.Buffer)
-	_, err := bufferReqBody.ReadFrom(req.Body)
+	_, err = bufferReqBody.ReadFrom(req.Body)
 	if err != nil {
 		hs.configuration.T.Fatalf("error reading request body: %v", err)
 	}
