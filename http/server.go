@@ -193,6 +193,7 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 		default:
 			inBytes, err = json.Marshal(response.Body)
 			if err != nil {
+				hs.server.Close()
 				hs.configuration.T.Fatalf("error marshaling json: %v", err)
 			}
 		}
@@ -207,6 +208,7 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 	bufferReqBody := new(bytes.Buffer)
 	_, err = bufferReqBody.ReadFrom(req.Body)
 	if err != nil {
+		hs.server.Close()
 		hs.configuration.T.Fatalf("error reading request body: %v", err)
 	}
 
