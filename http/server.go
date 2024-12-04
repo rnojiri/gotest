@@ -126,6 +126,7 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 
 	modeMaps, ok := hs.responseMap[hs.mode]
 	if !ok {
+		hs.server.Close()
 		hs.configuration.T.Fatalf("no configuration set with name: %s", hs.mode)
 	}
 
@@ -159,11 +160,13 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	if !found {
+		hs.server.Close()
 		hs.configuration.T.Fatalf("no enpoint configured with uri: %s", cleanURI)
 	}
 
 	response, ok := endpoint.Methods[req.Method]
 	if !ok {
+		hs.server.Close()
 		hs.configuration.T.Fatalf("no method configured under uri: %s", cleanURI)
 		return
 	}
