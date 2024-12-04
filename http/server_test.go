@@ -1,7 +1,7 @@
 package http_test
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -18,9 +18,8 @@ import (
 **/
 
 var defaultConf gotesthttp.Configuration = gotesthttp.Configuration{
-	Host:        "localhost",
-	Port:        18080,
-	ChannelSize: 5,
+	Host: "localhost",
+	Port: 18080,
 }
 
 // createDummyEndpoint - creates a dummy response data
@@ -137,7 +136,7 @@ func compareResponses(t *testing.T, r1 gotesthttp.Response, r2 *http.Response) b
 
 	result := true
 
-	receivedBody, err := ioutil.ReadAll(r2.Body)
+	receivedBody, err := io.ReadAll(r2.Body)
 	assert.NoError(t, err, "expects no error reading the response body")
 
 	result = result && assert.Equal(t, r1.Body.(string), string(receivedBody), "same body expected")

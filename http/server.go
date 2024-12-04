@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"regexp"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -44,6 +45,8 @@ type Response struct {
 type Endpoint struct {
 	// URI - the endpoint's uri
 	URI string
+	// QueryString - the query string format
+	QueryString []string
 	// Methods - the list of http methods (GET, POST, ...) containing the respective response
 	Methods map[string]Response
 	// Regexp - activates regular expression for uris
@@ -52,21 +55,21 @@ type Endpoint struct {
 
 // Server - the server listening for HTTP requests
 type Server struct {
-	server         *httptest.Server
-	requestChannel chan *Request
-	responseMap    map[string]map[string]Endpoint
-	errors         []error
-	configuration  *Configuration
-	mode           string
+	server        *httptest.Server
+	requests      []Request
+	responseMap   map[string]map[string]Endpoint
+	errors        []error
+	configuration *Configuration
+	mode          string
+	mutex         sync.Mutex
 }
 
 // Configuration - configuration
 type Configuration struct {
-	Host        string
-	Port        int
-	ChannelSize int
-	Responses   map[string][]Endpoint
-	T           *testing.T
+	Host      string
+	Port      int
+	Responses map[string][]Endpoint
+	T         *testing.T
 }
 
 var multipleBarRegexp = regexp.MustCompile("[/]+")
@@ -83,7 +86,7 @@ func NewServer(configuration *Configuration) *Server {
 	}
 
 	hs := &Server{
-		requestChannel: make(chan *Request, configuration.ChannelSize),
+		requests: []Request{},
 	}
 
 	hs.responseMap = map[string]map[string]Endpoint{}
@@ -109,6 +112,7 @@ func NewServer(configuration *Configuration) *Server {
 	copier.Copy(&confCopy, configuration)
 
 	hs.server.Listener = listener
+	hs.mutex = sync.Mutex{}
 	hs.server.Start()
 	hs.configuration = &confCopy
 
@@ -122,17 +126,21 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 
 	modeMaps, ok := hs.responseMap[hs.mode]
 	if !ok {
+		hs.server.Close()
 		hs.configuration.T.Fatalf("no configuration set with name: %s", hs.mode)
 	}
 
 	var endpoint Endpoint
+	var err error
 	found := false
 
 	for uri, item := range modeMaps {
 
+		match := false
+
 		if item.Regexp {
 
-			match, err := regexp.MatchString(uri, cleanURI)
+			match, err = regexp.MatchString(uri, cleanURI)
 			if err != nil {
 				hs.configuration.T.Fatalf("failed to run regexp: %s", cleanURI)
 			}
@@ -142,8 +150,9 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 				found = true
 				break
 			}
+		}
 
-		} else if uri == cleanURI {
+		if !match && uri == cleanURI {
 			endpoint = item
 			found = true
 			break
@@ -151,11 +160,13 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	if !found {
+		hs.server.Close()
 		hs.configuration.T.Fatalf("no enpoint configured with uri: %s", cleanURI)
 	}
 
 	response, ok := endpoint.Methods[req.Method]
 	if !ok {
+		hs.server.Close()
 		hs.configuration.T.Fatalf("no method configured under uri: %s", cleanURI)
 		return
 	}
@@ -182,6 +193,7 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 		default:
 			inBytes, err = json.Marshal(response.Body)
 			if err != nil {
+				hs.server.Close()
 				hs.configuration.T.Fatalf("error marshaling json: %v", err)
 			}
 		}
@@ -194,17 +206,24 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	bufferReqBody := new(bytes.Buffer)
-	_, err := bufferReqBody.ReadFrom(req.Body)
+	_, err = bufferReqBody.ReadFrom(req.Body)
 	if err != nil {
+		hs.server.Close()
 		hs.configuration.T.Fatalf("error reading request body: %v", err)
 	}
 
-	hs.requestChannel <- &Request{
-		URI:     cleanURI,
-		Body:    bufferReqBody.Bytes(),
-		Headers: req.Header.Clone(),
-		Method:  req.Method,
-	}
+	hs.mutex.Lock()
+	hs.mutex.Unlock()
+
+	hs.requests = append(
+		hs.requests,
+		Request{
+			URI:     cleanURI,
+			Body:    bufferReqBody.Bytes(),
+			Headers: req.Header.Clone(),
+			Method:  req.Method,
+		},
+	)
 }
 
 // Close - closes this server
@@ -212,14 +231,33 @@ func (hs *Server) Close() {
 
 	if hs.server != nil {
 		hs.server.Close()
-		close(hs.requestChannel)
 	}
 }
 
 // RequestChannel - reads from the request channel
-func (hs *Server) RequestChannel() <-chan *Request {
+func (hs *Server) RequestChannel() []Request {
 
-	return hs.requestChannel
+	return hs.requests
+}
+
+func (hs *Server) FirstRequest() *Request {
+
+	hs.mutex.Lock()
+	hs.mutex.Unlock()
+
+	if len(hs.requests) == 0 {
+		return nil
+	}
+
+	req := hs.requests[0]
+
+	if len(hs.requests) == 0 {
+		hs.requests = []Request{}
+	} else {
+		hs.requests = hs.requests[1:]
+	}
+
+	return &req
 }
 
 // SetMode - sets the server mode
