@@ -126,7 +126,6 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 
 	modeMaps, ok := hs.responseMap[hs.mode]
 	if !ok {
-		hs.server.Close()
 		hs.configuration.T.Fatalf("no configuration set with name: %s", hs.mode)
 	}
 
@@ -160,15 +159,12 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	if !found {
-		hs.server.Close()
 		hs.configuration.T.Fatalf("no enpoint configured with uri: %s", cleanURI)
 	}
 
 	response, ok := endpoint.Methods[req.Method]
 	if !ok {
-		hs.server.Close()
 		hs.configuration.T.Fatalf("no method configured under uri: %s", cleanURI)
-		return
 	}
 
 	if response.Wait != 0 {
@@ -193,7 +189,6 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 		default:
 			inBytes, err = json.Marshal(response.Body)
 			if err != nil {
-				hs.server.Close()
 				hs.configuration.T.Fatalf("error marshaling json: %v", err)
 			}
 		}
@@ -208,12 +203,11 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 	bufferReqBody := new(bytes.Buffer)
 	_, err = bufferReqBody.ReadFrom(req.Body)
 	if err != nil {
-		hs.server.Close()
 		hs.configuration.T.Fatalf("error reading request body: %v", err)
 	}
 
 	hs.mutex.Lock()
-	hs.mutex.Unlock()
+	defer hs.mutex.Unlock()
 
 	hs.requests = append(
 		hs.requests,
@@ -243,7 +237,7 @@ func (hs *Server) RequestChannel() []Request {
 func (hs *Server) FirstRequest() *Request {
 
 	hs.mutex.Lock()
-	hs.mutex.Unlock()
+	defer hs.mutex.Unlock()
 
 	if len(hs.requests) == 0 {
 		return nil
