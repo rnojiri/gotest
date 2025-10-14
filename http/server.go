@@ -186,6 +186,8 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 			inBytes = []byte(response.Body.(string))
 		case bool:
 			inBytes = []byte(strconv.FormatBool(response.Body.(bool)))
+		case []byte:
+			inBytes = response.Body.([]byte)			
 		default:
 			inBytes, err = json.Marshal(response.Body)
 			if err != nil {
