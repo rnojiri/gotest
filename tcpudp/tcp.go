@@ -25,7 +25,6 @@ type TCPServer struct {
 
 // TCPConfiguration - the tcp server configuration
 type TCPConfiguration struct {
-	ReadTimeout    time.Duration
 	WriteTimeout   time.Duration
 	ResponseString string
 	ServerConfiguration
@@ -34,10 +33,6 @@ type TCPConfiguration struct {
 func (tc *TCPConfiguration) setDefaults() {
 
 	tc.ServerConfiguration.setDefaults()
-
-	if tc.ReadTimeout <= 0 {
-		tc.ReadTimeout = 3 * time.Second
-	}
 
 	if tc.WriteTimeout <= 0 {
 		tc.WriteTimeout = 3 * time.Second
