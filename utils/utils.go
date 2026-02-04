@@ -1,27 +1,15 @@
 package gotest
 
 import (
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"strconv"
 	"time"
 )
 
-var seedGenerated bool
-
-// GenerateRandomSeed - generates a random seed across the entire test
-func GenerateRandomSeed() {
-
-	if !seedGenerated {
-		rand.Seed(time.Now().Unix())
-		seedGenerated = true
-	}
-}
-
 // GeneratePort - generates a port
 func GeneratePort() int {
-
-	GenerateRandomSeed()
 
 	port, err := strconv.Atoi(fmt.Sprintf("1%d", RandomInt(1000, 8888)))
 	if err != nil {
@@ -34,9 +22,12 @@ func GeneratePort() int {
 // RandomInt - generates a random int
 func RandomInt(min, max int) int {
 
-	GenerateRandomSeed()
+	nBig, err := rand.Int(rand.Reader, big.NewInt(int64(max+1)))
+	if err != nil {
+		panic(err)
+	}
 
-	return min + rand.Intn(max+1)
+	return min + int(nBig.Int64())
 }
 
 // MustParseDuration - forces to parse the duration or it panics

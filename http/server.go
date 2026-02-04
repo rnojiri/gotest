@@ -12,8 +12,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/jinzhu/copier"
 )
 
 /**
@@ -103,18 +101,15 @@ func NewServer(configuration *Configuration) *Server {
 
 	hs.server = httptest.NewUnstartedServer(http.HandlerFunc(hs.handler))
 
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", configuration.Host, configuration.Port))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", configuration.Host, configuration.Port)) //nolint:noctx
 	if err != nil {
 		panic(err)
 	}
 
-	confCopy := Configuration{}
-	copier.Copy(&confCopy, configuration)
-
 	hs.server.Listener = listener
 	hs.mutex = sync.Mutex{}
 	hs.server.Start()
-	hs.configuration = &confCopy
+	hs.configuration = configuration
 
 	return hs
 }
@@ -187,7 +182,7 @@ func (hs *Server) handler(res http.ResponseWriter, req *http.Request) {
 		case bool:
 			inBytes = []byte(strconv.FormatBool(response.Body.(bool)))
 		case []byte:
-			inBytes = response.Body.([]byte)			
+			inBytes = response.Body.([]byte)
 		default:
 			inBytes, err = json.Marshal(response.Body)
 			if err != nil {

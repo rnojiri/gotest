@@ -19,7 +19,7 @@ import (
 const (
 	testHost   string = "localhost"
 	numMsgChan int    = 100
-	bufferSize int    = 256
+	bufferSize int    = 2048
 )
 
 var (
@@ -27,6 +27,7 @@ var (
 		ServerConfiguration: tcpudp.ServerConfiguration{
 			Host:               testHost,
 			MessageChannelSize: numMsgChan,
+			MessageTimeout:     5 * time.Second,
 			ReadBufferSize:     bufferSize,
 		},
 		ReadTimeout: time.Second,
@@ -45,7 +46,7 @@ func TestTCPCreateServer(t *testing.T) {
 	assert.GreaterOrEqual(t, p, 10000, "expected port greater than 10000")
 }
 
-func mustCreateTCPServer(autoStart bool, readTimeout time.Duration) (*tcpudp.TCPServer, int) {
+func mustCreateTCPServer(autoStart bool) (*tcpudp.TCPServer, int) {
 
 	s, port := tcpudp.NewTCPServer(&defaultTCPConf, autoStart)
 
@@ -55,7 +56,7 @@ func mustCreateTCPServer(autoStart bool, readTimeout time.Duration) (*tcpudp.TCP
 // TestTCPNotStartedServerStop - tests the stop server function
 func TestTCPNotStartedServerStop(t *testing.T) {
 
-	s, _ := mustCreateTCPServer(false, time.Second)
+	s, _ := mustCreateTCPServer(false)
 	if s == nil {
 		return
 	}
@@ -67,7 +68,7 @@ func TestTCPNotStartedServerStop(t *testing.T) {
 // TestTCPStartedServerStop - tests the stop server function
 func TestTCPStartedServerStop(t *testing.T) {
 
-	s, _ := mustCreateTCPServer(true, time.Second)
+	s, _ := mustCreateTCPServer(true)
 	if s == nil {
 		return
 	}
@@ -100,7 +101,7 @@ func testMessage(t *testing.T, message *tcpudp.MessageData, expectedText string,
 // TestTCPOneMessage - tests the server with only one message
 func TestTCPOneMessage(t *testing.T) {
 
-	s, port := mustCreateTCPServer(true, time.Second)
+	s, port := mustCreateTCPServer(true)
 	defer s.Stop()
 	if s == nil {
 		return
@@ -119,8 +120,8 @@ func TestTCPOneMessage(t *testing.T) {
 		return
 	}
 
-	message := <-s.MessageChannel()
-	if !testMessage(t, &message, payload, port, now) {
+	message := s.GetMessage()
+	if !testMessage(t, message, payload, port, now) {
 		return
 	}
 
@@ -130,7 +131,7 @@ func TestTCPOneMessage(t *testing.T) {
 // TestTCPMultipleMessagesSameConn - tests the server with multiple messages using same connection
 func TestTCPMultipleMessagesSameConn(t *testing.T) {
 
-	s, port := mustCreateTCPServer(true, time.Second)
+	s, port := mustCreateTCPServer(true)
 	defer s.Stop()
 	if s == nil {
 		return
@@ -153,7 +154,7 @@ func TestTCPMultipleMessagesSameConn(t *testing.T) {
 		}
 	}
 
-	message := <-s.MessageChannel()
+	message := s.GetMessage()
 
 	messages := strings.Split(message.Message, "\n")
 	messages = messages[:len(messages)-1] //removes the last blank item
@@ -174,7 +175,7 @@ func TestTCPMultipleMessagesSameConn(t *testing.T) {
 // TestTCPMultipleMessagesMultiConn - tests the server with multiple messages using multiple connections
 func TestTCPMultipleMessagesMultiConn(t *testing.T) {
 
-	s, port := mustCreateTCPServer(true, time.Second)
+	s, port := mustCreateTCPServer(true)
 	defer s.Stop()
 	if s == nil {
 		return
@@ -202,8 +203,8 @@ func TestTCPMultipleMessagesMultiConn(t *testing.T) {
 
 	for i := 0; i < numMessages; i++ {
 
-		message := <-s.MessageChannel()
-		if !testMessage(t, &message, payloadArray[i], port, timeArray[i]) {
+		message := s.GetMessage()
+		if !testMessage(t, message, payloadArray[i], port, timeArray[i]) {
 			return
 		}
 	}
@@ -248,8 +249,8 @@ func TestTCPServerResponse(t *testing.T) {
 		return
 	}
 
-	message := <-s.MessageChannel()
-	if !testMessage(t, &message, payload, port, now) {
+	message := s.GetMessage()
+	if !testMessage(t, message, payload, port, now) {
 		return
 	}
 
