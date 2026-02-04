@@ -19,9 +19,29 @@ type MessageData struct {
 
 // ServerConfiguration - common configuration
 type ServerConfiguration struct {
+	MessageTimeout     time.Duration
 	Host               string
 	MessageChannelSize int
 	ReadBufferSize     int
+}
+
+func (sc *ServerConfiguration) setDefaults() {
+
+	if sc.ReadBufferSize <= 0 {
+		sc.ReadBufferSize = 4096
+	}
+
+	if sc.MessageChannelSize <= 0 {
+		sc.MessageChannelSize = 100
+	}
+
+	if sc.MessageTimeout <= 0 {
+		sc.MessageTimeout = 5 * time.Second
+	}
+
+	if sc.Host == "" {
+		sc.Host = "localhost"
+	}
 }
 
 // server - core

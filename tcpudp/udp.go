@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jinzhu/copier"
 	utils "github.com/rnojiri/gotest/utils"
 )
 
@@ -25,9 +24,14 @@ type UDPServer struct {
 // NewUDPServer - creates a new udp server on a random port
 func NewUDPServer(configuration *ServerConfiguration, start bool) (*UDPServer, int) {
 
+	if configuration == nil {
+		configuration = &ServerConfiguration{}
+	}
+
+	configuration.setDefaults()
+
 	var listener *net.UDPConn
 	var port int
-	var err error
 
 	for i := 0; i < listenRetries; i++ {
 
@@ -50,20 +54,13 @@ func NewUDPServer(configuration *ServerConfiguration, start bool) (*UDPServer, i
 		}
 	}
 
-	if err != nil {
-		panic(err)
-	}
-
-	confCopy := ServerConfiguration{}
-	copier.Copy(&confCopy, configuration)
-
 	server := &UDPServer{
 		server: server{
 			messageChannel: make(chan MessageData, configuration.MessageChannelSize),
 			port:           port,
 		},
 		listener:      listener,
-		configuration: &confCopy,
+		configuration: configuration,
 	}
 
 	if start {
@@ -78,11 +75,6 @@ func (us *UDPServer) Start() {
 
 	if us.started {
 		return
-	}
-
-	err := us.listener.SetReadBuffer(us.configuration.ReadBufferSize)
-	if err != nil {
-		panic(err)
 	}
 
 	us.started = true
@@ -126,10 +118,21 @@ func (us *UDPServer) handlePacket(buffer []byte) {
 	}
 }
 
-// MessageChannel - reads from the message channel
-func (us *UDPServer) MessageChannel() <-chan MessageData {
+// GetMessage - get the message from channel
+func (us *UDPServer) GetMessage() *MessageData {
 
-	return us.messageChannel
+	timeout := time.After(us.configuration.MessageTimeout)
+
+	for {
+		select {
+		case <-timeout:
+			return nil
+		case msg := <-us.messageChannel:
+			return &msg
+		default:
+			<-time.After(100 * time.Millisecond)
+		}
+	}
 }
 
 // GetErrors - get asynchronous errors

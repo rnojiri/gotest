@@ -7,14 +7,13 @@ import (
 	"time"
 )
 
-var seedGenerated bool
+var randInstance *rand.Rand
 
 // GenerateRandomSeed - generates a random seed across the entire test
 func GenerateRandomSeed() {
 
-	if !seedGenerated {
-		rand.Seed(time.Now().Unix())
-		seedGenerated = true
+	if randInstance == nil {
+		randInstance = rand.New(rand.NewSource(time.Now().UnixNano()))
 	}
 }
 
@@ -36,7 +35,7 @@ func RandomInt(min, max int) int {
 
 	GenerateRandomSeed()
 
-	return min + rand.Intn(max+1)
+	return min + randInstance.Intn(max+1)
 }
 
 // MustParseDuration - forces to parse the duration or it panics

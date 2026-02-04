@@ -32,12 +32,30 @@ type TCPConfiguration struct {
 	ServerConfiguration
 }
 
+func (tc *TCPConfiguration) setDefaults() {
+
+	tc.ServerConfiguration.setDefaults()
+
+	if tc.ReadTimeout <= 0 {
+		tc.ReadTimeout = 3 * time.Second
+	}
+
+	if tc.WriteTimeout <= 0 {
+		tc.WriteTimeout = 3 * time.Second
+	}
+}
+
 // NewTCPServer - creates a new telnet server on a random port
 func NewTCPServer(configuration *TCPConfiguration, start bool) (*TCPServer, int) {
 
+	if configuration == nil {
+		configuration = &TCPConfiguration{}
+	}
+
+	configuration.setDefaults()
+
 	var listener net.Listener
 	var port int
-	var err error
 
 	for i := 0; i < listenRetries; i++ {
 
@@ -58,10 +76,6 @@ func NewTCPServer(configuration *TCPConfiguration, start bool) (*TCPServer, int)
 		} else {
 			break
 		}
-	}
-
-	if err != nil {
-		panic(err)
 	}
 
 	confCopy := TCPConfiguration{}
@@ -175,10 +189,21 @@ func (ts *TCPServer) handleConnection(conn net.Conn) {
 	}
 }
 
-// MessageChannel - reads from the message channel
-func (ts *TCPServer) MessageChannel() <-chan MessageData {
+// GetMessage - get the message from channel
+func (ts *TCPServer) GetMessage() *MessageData {
 
-	return ts.messageChannel
+	timeout := time.After(ts.configuration.MessageTimeout)
+
+	for {
+		select {
+		case <-timeout:
+			return nil
+		case msg := <-ts.messageChannel:
+			return &msg
+		default:
+			<-time.After(100 * time.Millisecond)
+		}
+	}
 }
 
 // GetErrors - get asynchronous errors
