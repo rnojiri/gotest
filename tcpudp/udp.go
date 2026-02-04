@@ -1,6 +1,7 @@
 package tcpudp
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"strings"
@@ -84,20 +85,34 @@ func (us *UDPServer) Start() {
 
 func (us *UDPServer) startListeningLoop() {
 
+	var err error
+	fullBuffer := bytes.Buffer{}
+	var bytesRead int
+	buffer := make([]byte, us.configuration.ReadBufferSize)
+
+mainLoop:
 	for {
-		buffer := make([]byte, us.configuration.ReadBufferSize)
-
-		rlen, err := us.listener.Read(buffer)
+		err = us.listener.SetReadDeadline(time.Now().Add(us.configuration.ReadTimeout))
 		if err != nil {
-			// check if connection was closed
-			if strings.Contains(err.Error(), "use of closed network connection") {
-				return
-			}
-
-			panic(err)
+			break
 		}
 
-		us.handlePacket(buffer[0:rlen])
+		bytesRead, err = us.listener.Read(buffer)
+		if err != nil || bytesRead == 0 {
+			us.handlePacket(fullBuffer.Bytes())
+			fullBuffer.Reset()
+			continue mainLoop
+		}
+
+		_, err = fullBuffer.Write(buffer[:bytesRead])
+		if err != nil {
+			break
+		}
+
+		if bytesRead < us.configuration.ReadBufferSize {
+			us.handlePacket(fullBuffer.Bytes())
+			fullBuffer.Reset()
+		}
 	}
 }
 

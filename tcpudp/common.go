@@ -20,12 +20,17 @@ type MessageData struct {
 // ServerConfiguration - common configuration
 type ServerConfiguration struct {
 	MessageTimeout     time.Duration
+	ReadTimeout        time.Duration
 	Host               string
 	MessageChannelSize int
 	ReadBufferSize     int
 }
 
 func (sc *ServerConfiguration) setDefaults() {
+
+	if sc.ReadTimeout <= 0 {
+		sc.ReadTimeout = 3 * time.Second
+	}
 
 	if sc.ReadBufferSize <= 0 {
 		sc.ReadBufferSize = 4096

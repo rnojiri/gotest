@@ -29,8 +29,8 @@ var (
 			MessageChannelSize: numMsgChan,
 			MessageTimeout:     5 * time.Second,
 			ReadBufferSize:     bufferSize,
+			ReadTimeout:        time.Second,
 		},
-		ReadTimeout: time.Second,
 	}
 )
 
