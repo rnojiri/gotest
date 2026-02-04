@@ -18,7 +18,7 @@ import (
 func (hs *Server) DoRequest(request *Request) *http.Response {
 
 	transportCore := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
 	}
 
 	client := &http.Client{
@@ -26,7 +26,7 @@ func (hs *Server) DoRequest(request *Request) *http.Response {
 		Timeout:   10 * time.Second,
 	}
 
-	req, err := http.NewRequest(
+	req, err := http.NewRequest( //nolint:noctx
 		request.Method,
 		fmt.Sprintf("http://%s:%d/%s", hs.configuration.Host, hs.configuration.Port, request.URI),
 		bytes.NewBuffer(request.Body),
