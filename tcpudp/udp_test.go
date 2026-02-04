@@ -20,6 +20,7 @@ var (
 		Host:               testHost,
 		MessageChannelSize: numMsgChan,
 		ReadBufferSize:     bufferSize,
+		MessageTimeout:     5 * time.Second,
 	}
 )
 
@@ -86,8 +87,8 @@ func TestUDPOneMessage(t *testing.T) {
 		return
 	}
 
-	message := <-s.MessageChannel()
-	if !testMessage(t, &message, payload, port, now) {
+	message := s.GetMessage()
+	if !testMessage(t, message, payload, port, now) {
 		return
 	}
 
@@ -126,8 +127,8 @@ func TestUDPMultipleMessages(t *testing.T) {
 
 	for i := 0; i < numMessages; i++ {
 
-		message := <-s.MessageChannel()
-		if !testMessage(t, &message, payloads[i], port, times[i]) {
+		message := s.GetMessage()
+		if !testMessage(t, message, payloads[i], port, times[i]) {
 			return
 		}
 	}
